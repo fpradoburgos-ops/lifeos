@@ -1633,6 +1633,122 @@ export default function App() {
     return new Date(y, (m || 1) - 1, d || 1);
   };
 
+  const escapeIcsText = (value: string) => value
+    .replace(/\\/g, '\\\\')
+    .replace(/\n/g, '\\n')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;');
+
+  const icsDateTime = (date: string, time = '09:00') => {
+    const cleanDate = date.replace(/-/g, '');
+    const [h = '09', m = '00'] = time.split(':');
+    return `${cleanDate}T${h.padStart(2, '0')}${m.padStart(2, '0')}00`;
+  };
+
+  const addMinutesToLocalDateTime = (date: string, time: string, minutes: number) => {
+    const [y, mo, d] = date.split('-').map(Number);
+    const [h, m] = time.split(':').map(Number);
+    const dt = new Date(y, (mo || 1) - 1, d || 1, h || 0, m || 0, 0);
+    dt.setMinutes(dt.getMinutes() + minutes);
+    const ds = formatLocalDate(dt).replace(/-/g, '');
+    return `${ds}T${String(dt.getHours()).padStart(2, '0')}${String(dt.getMinutes()).padStart(2, '0')}00`;
+  };
+
+  const buildIcsAlarm = (reminder?: AcademicTask['reminder'] | PersonalTodo['reminder']) => {
+    const trigger = reminder === '1h' ? '-PT1H' : reminder === '1d' ? '-P1D' : reminder === '1w' ? '-P7D' : '';
+    return trigger ? `BEGIN:VALARM\r\nTRIGGER:${trigger}\r\nACTION:DISPLAY\r\nDESCRIPTION:Recordatorio LifeOS\r\nEND:VALARM\r\n` : '';
+  };
+
+  const downloadCalendarEvent = async (event: {
+    id: string; title: string; date: string; startTime?: string; endTime?: string; description?: string; reminder?: AcademicTask['reminder'] | PersonalTodo['reminder'];
+  }) => {
+    if (!event.date || event.date === 'Pronto') {
+      alert('Primero agrega una fecha para poder enviarlo al Calendario.');
+      return;
+    }
+
+    const startTime = event.startTime || '09:00';
+    const endValue = event.endTime
+      ? icsDateTime(event.date, event.endTime)
+      : addMinutesToLocalDateTime(event.date, startTime, 60);
+    const nowStamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+    const description = event.description ? `DESCRIPTION:${escapeIcsText(event.description)}\r\n` : '';
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//LifeOS//Calendario//ES',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      `UID:${event.id}@lifeos`,
+      `DTSTAMP:${nowStamp}`,
+      `DTSTART:${icsDateTime(event.date, startTime)}`,
+      `DTEND:${endValue}`,
+      `SUMMARY:${escapeIcsText(event.title)}`,
+      description.trimEnd(),
+      buildIcsAlarm(event.reminder).trimEnd(),
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].filter(Boolean).join('\r\n') + '\r\n';
+
+    const fileName = `LifeOS-${event.title.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ_-]+/g, '-').replace(/-+/g, '-').slice(0, 60) || 'evento'}.ics`;
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+
+    // En iPhone/iPad, especialmente cuando LifeOS está instalada como PWA,
+    // los enlaces con `download` pueden no hacer nada. Usamos la hoja de
+    // compartir nativa cuando Safari/iOS permite compartir archivos.
+    try {
+      const calendarFile = new File([ics], fileName, { type: 'text/calendar' });
+      const shareData = {
+        files: [calendarFile],
+        title: event.title,
+        text: 'Evento creado desde LifeOS'
+      };
+      const canShareFile = typeof navigator !== 'undefined'
+        && typeof navigator.share === 'function'
+        && (!navigator.canShare || navigator.canShare(shareData));
+
+      if (canShareFile) {
+        await navigator.share(shareData);
+        return;
+      }
+    } catch (error: any) {
+      // Si el usuario cierra la hoja de compartir, no mostramos un error.
+      if (error?.name === 'AbortError') return;
+      console.warn('LifeOS: no se pudo abrir la hoja de compartir del calendario.', error);
+    }
+
+    // Fallback para escritorio y navegadores sin Web Share API de archivos.
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+
+  const exportAcademicTaskToCalendar = (task: AcademicTask) => downloadCalendarEvent({
+    id: `academic-${task.id}`,
+    title: task.title,
+    date: task.dueDate,
+    startTime: task.startTime || '09:00',
+    endTime: task.endTime,
+    description: `${task.subject} · ${task.type}${task.weight ? ` · Ponderación ${task.weight}%` : ''}${task.notes ? `\n${task.notes}` : ''}`,
+    reminder: task.reminder
+  });
+
+  const exportTodoToCalendar = (todo: PersonalTodo) => downloadCalendarEvent({
+    id: `todo-${todo.id}`,
+    title: todo.title,
+    date: todo.dueDate,
+    startTime: todo.dueTime || '09:00',
+    description: `${todo.category} · Prioridad ${todo.priority} · To-Do de LifeOS`,
+    reminder: todo.reminder
+  });
+
   const shiftLocalDate = (date: Date, days: number) => {
     const copy = new Date(date);
     copy.setDate(copy.getDate() + days);
@@ -2764,9 +2880,12 @@ export default function App() {
                         <span style={{ fontSize: '11px', color: theme.primary }}>{t.subject} ({t.type}) • Pondera {t.weight}%</span>
                         {t.notes && <div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '2px' }}>{t.notes}</div>}
                       </div>
-                      <div style={{ textAlign: 'right' }}>
+                      <div style={{ textAlign: 'right', minWidth: 132 }}>
                         <span style={{ fontSize: '12px', fontWeight: 'bold' }}>📅 {t.dueDate}</span>
-                        <div>
+                        <div style={{display:'flex',justifyContent:'flex-end',gap:4,marginTop:5,flexWrap:'wrap'}}>
+                          <button type="button" onClick={() => exportAcademicTaskToCalendar(t)} title="Añadir al Calendario de iPhone / Apple Calendar" style={{ background: darkMode ? '#18181b' : '#f4f4f5', border: `1px solid ${theme.cardBorder}`, color: theme.text, cursor: 'pointer', padding: '5px 7px', borderRadius: 8, display:'inline-flex',alignItems:'center',gap:4,fontSize:10,fontWeight:800 }}>
+                            <CalendarCheck2 size={13} /> Calendario
+                          </button>
                           <button onClick={() => setAcademicTasks(academicTasks.filter(item => item.id !== t.id))} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}>
                             <Trash2 size={14} />
                           </button>
@@ -3057,10 +3176,13 @@ export default function App() {
                         </div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent:'flex-end', gap: '6px', flexWrap:'wrap' }}>
                       <span style={{ fontSize: '12px', fontWeight: 'bold', color: item.dueDate ? theme.text : theme.textMuted }}>
                         📅 {item.dueDate || 'Sin fecha'}{item.dueTime ? ` · ${item.dueTime}` : ''}
                       </span>
+                      <button type="button" onClick={() => exportTodoToCalendar(item)} title="Añadir al Calendario de iPhone / Apple Calendar" style={{ background: darkMode ? '#18181b' : '#f4f4f5', border: `1px solid ${theme.cardBorder}`, color: theme.text, cursor: 'pointer', padding: '5px 7px', borderRadius: 8, display:'inline-flex',alignItems:'center',gap:4,fontSize:10,fontWeight:800 }}>
+                        <CalendarCheck2 size={13} /> Calendario
+                      </button>
                       <button onClick={() => setPersonalTodos(personalTodos.filter(td => td.id !== item.id))} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}>
                         <Trash2 size={16} />
                       </button>
