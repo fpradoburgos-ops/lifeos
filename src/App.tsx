@@ -822,6 +822,7 @@ export default function App() {
 
   // Modales
   const [showHabitModal, setShowHabitModal] = useState(false);
+  const [editingHabitId, setEditingHabitId] = useState<number | null>(null);
   const [showAcademicTaskModal, setShowAcademicTaskModal] = useState(false);
   const [showTodoModal, setShowTodoModal] = useState(false);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
@@ -1576,6 +1577,50 @@ export default function App() {
     setSavingGoals(savingGoals.map(g => g.id === goalId ? { ...g, currentAmount: Math.min(g.targetAmount, g.currentAmount + amount) } : g));
   };
 
+  const resetHabitForm = () => {
+    setEditingHabitId(null);
+    setNewHabitName('');
+    setNewHabitIcon('🏋️');
+    setNewHabitCat('Salud');
+    setNewHabitFrequency('daily');
+    setNewHabitWeeklyTarget('3');
+    setNewHabitIsBad(false);
+    setNewHabitHasEndDate(false);
+    setNewHabitEndDate('');
+  };
+
+  const openNewHabitModal = () => {
+    resetHabitForm();
+    setShowHabitModal(true);
+  };
+
+  const openEditHabitModal = (habit: Habit) => {
+    setEditingHabitId(habit.id);
+    setNewHabitName(habit.name);
+    setNewHabitIcon(habit.icon || '🏋️');
+    setNewHabitCat(habit.category || 'Salud');
+    setNewHabitFrequency(habit.frequency === 'weekly' ? 'weekly' : 'daily');
+    setNewHabitWeeklyTarget(String(habit.weeklyTarget || 3));
+    setNewHabitIsBad(Boolean(habit.isBad));
+    setNewHabitHasEndDate(Boolean(habit.hasEndDate));
+    setNewHabitEndDate(habit.endDate || '');
+    setShowHabitModal(true);
+  };
+
+  const deleteHabit = (habit: Habit) => {
+    if (!confirm(`¿Eliminar “${habit.name}”? También se borrará su historial de registros y racha.`)) return;
+    setHabits(prev => prev.filter(h => h.id !== habit.id));
+    setHabitLog(prev => {
+      const next = { ...prev };
+      delete next[String(habit.id)];
+      return next;
+    });
+    if (editingHabitId === habit.id) {
+      setShowHabitModal(false);
+      resetHabitForm();
+    }
+  };
+
   const formatLocalDate = (date: Date) => {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -1660,6 +1705,31 @@ export default function App() {
   const totalHabitCompletionsThisMonth = habits.reduce((sum, h) => sum + habitCountBetween(h.id, monthStart, monthEnd), 0);
   const monthPossible = habits.length * monthEnd.getDate();
   const monthRate = monthPossible ? Math.round((totalHabitCompletionsThisMonth / monthPossible) * 100) : 0;
+
+  // Racha global: días consecutivos con todos los hábitos diarios completados.
+  // Si hoy aún no está completo, conserva la racha hasta ayer.
+  const dashboardHabitStreak = (() => {
+    const dailyHabits = habits.filter(h => h.frequency !== 'weekly');
+    const streakHabits = dailyHabits.length > 0 ? dailyHabits : habits;
+    if (streakHabits.length === 0) return 0;
+
+    const isDayComplete = (date: Date) => {
+      const ds = formatLocalDate(date);
+      const active = streakHabits.filter(h => !h.hasEndDate || !h.endDate || ds <= h.endDate);
+      return active.length > 0 && active.every(h => isHabitDoneOn(h.id, ds));
+    };
+
+    const cursor = new Date();
+    cursor.setHours(12, 0, 0, 0);
+    if (!isDayComplete(cursor)) cursor.setDate(cursor.getDate() - 1);
+
+    let streak = 0;
+    while (streak < 3650 && isDayComplete(cursor)) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return streak;
+  })();
   // Registro de la 1ª o 2ª oportunidad.
   const handleUpdateExamGrade = (subjectId: number, attempt: 1 | 2 = 1) => {
     const subject = subjects.find(s => s.id === subjectId);
@@ -2144,12 +2214,12 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                  <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10}}>
-                    <div className="lifeos-header-actions">
+                  <div style={{display:'flex',flexDirection:isMobile?'row':'column',alignItems:'center',justifyContent:isMobile?'space-between':'flex-end',width:isMobile?'100%':'auto',gap:isMobile?8:10}}>
+                    <div className="lifeos-header-actions" style={{width:isMobile?'auto':undefined,flex:isMobile?'1 1 auto':undefined}}>
                       <button onClick={() => setShowTodoModal(true)}><Plus size={15}/> To-Do</button>
                       <button onClick={() => { if (subjects.length > 0 && !taskSubject) setTaskSubject(subjects[0].name); setShowAcademicTaskModal(true); }}><Plus size={15}/> Evaluación</button>
                     </div>
-                    <div style={{fontSize:isMobile?20:24,fontWeight:900,letterSpacing:'-.04em',color:'#f5f5f5',fontVariantNumeric:'tabular-nums'}}>{currentTime12h}</div>
+                    <div style={{fontSize:isMobile?18:24,fontWeight:900,letterSpacing:'-.04em',color:'#f5f5f5',fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap',flexShrink:0}}>{currentTime12h}</div>
                   </div>
                 </section>
 
@@ -2225,6 +2295,21 @@ export default function App() {
                     <div className="lifeos-muted-line">{currentSemesterApprovedCount} de {currentSemesterMallaSubjects.length || subjects.length} ramos aprobados</div>
                     <div className="lifeos-sct-line"><strong>{approvedSct}</strong> / {totalSct} SCT acumulados</div>
                     <button className="lifeos-text-button" onClick={() => { setActiveTab('estudios'); setStudySubTab('malla'); }}>Ver malla →</button>
+                  </div>
+                </section>
+
+                {/* Racha global de hábitos: discreta y al final del dashboard */}
+                <section style={{marginTop:12}}>
+                  <div className="lifeos-dash-card" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:14,padding:isMobile?'12px 14px':'14px 18px',minHeight:0}}>
+                    <div style={{display:'flex',alignItems:'center',gap:11,minWidth:0}}>
+                      <div style={{fontSize:isMobile?24:28,lineHeight:1}}>🔥</div>
+                      <div style={{minWidth:0}}>
+                        <div className="lifeos-overline">RACHA DE HÁBITOS</div>
+                        <div style={{fontSize:isMobile?14:16,fontWeight:900,marginTop:2}}>{dashboardHabitStreak} {dashboardHabitStreak === 1 ? 'día' : 'días'} seguidos</div>
+                        <div style={{fontSize:9,color:'var(--lifeos-muted)',marginTop:2}}>Completando todos tus hábitos diarios</div>
+                      </div>
+                    </div>
+                    <button className="lifeos-text-button" onClick={() => setActiveTab('habitos')} style={{margin:0,whiteSpace:'nowrap'}}>Ver hábitos →</button>
                   </div>
                 </section>
 
@@ -2836,7 +2921,7 @@ export default function App() {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: 10, flexWrap: 'wrap' }}>
               <div><h1 style={{ fontSize: isMobile ? '22px' : '26px', fontWeight: '900', margin: 0 }}>Hábitos</h1><p style={{ color: theme.textMuted, fontSize: '12px', margin: '5px 0 0' }}>Primero registra hoy. Después revisa tu constancia semanal y mensual.</p></div>
-              <button onClick={() => setShowHabitModal(true)} style={{ padding: '9px 13px', backgroundColor: theme.text, color: darkMode ? '#090909' : '#fff', border: 'none', borderRadius: '10px', fontWeight: '800', fontSize: '12px', cursor: 'pointer' }}>+ Hábito</button>
+              <button onClick={openNewHabitModal} style={{ padding: '9px 13px', backgroundColor: theme.text, color: darkMode ? '#090909' : '#fff', border: 'none', borderRadius: '10px', fontWeight: '800', fontSize: '12px', cursor: 'pointer' }}>+ Hábito</button>
             </div>
 
             <div style={{display:'flex',gap:6,background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:12,padding:4,marginBottom:12,overflowX:'auto'}}>
@@ -2856,11 +2941,15 @@ export default function App() {
                     <div style={{fontSize:11,fontWeight:900}}>{habitsDone === habits.length && habits.length > 0 ? 'Día completo ✓' : `${Math.max(0, habits.length-habitsDone)} pendientes`}</div>
                   </div>
                   {habits.length === 0 ? <div style={{padding:'26px 10px',textAlign:'center',color:theme.textMuted,fontSize:12}}>Todavía no tienes hábitos. Crea el primero con “+ Hábito”.</div> : <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                    {habits.map(h=>{const done=isHabitDoneOn(h.id,todayStr); return <button key={h.id} onClick={()=>toggleHabitToday(h.id)} style={{width:'100%',display:'flex',alignItems:'center',gap:12,padding:'12px 13px',borderRadius:12,border:`1px solid ${done?theme.text:theme.cardBorder}`,background:done?(darkMode?'#1c1d20':'#f2f2f2'):darkMode?'#111113':'#fafafa',color:theme.text,textAlign:'left',cursor:'pointer'}}>
-                      <div style={{width:32,height:32,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',border:`1px solid ${done?theme.text:theme.cardBorder}`,background:done?theme.text:'transparent',color:done?(darkMode?'#090909':'#fff'):theme.text,fontSize:16,flexShrink:0}}>{done?'✓':(h.icon||'🎯')}</div>
+                    {habits.map(h=>{const done=isHabitDoneOn(h.id,todayStr); return <div key={h.id} onClick={()=>toggleHabitToday(h.id)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'12px 13px',borderRadius:12,border:`1px solid ${done?theme.text:theme.cardBorder}`,background:done?(darkMode?'#1c1d20':'#f2f2f2'):darkMode?'#111113':'#fafafa',color:theme.text,textAlign:'left',cursor:'pointer'}}>
+                      <div style={{width:29,height:29,borderRadius:9,border:`1px solid ${done?theme.text:theme.cardBorder}`,background:done?theme.text:'transparent',color:done?(darkMode?'#090909':'#fff'):theme.text,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,flexShrink:0}}>{done?'✓':h.icon}</div>
                       <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{h.name}</div><div style={{fontSize:10,color:theme.textMuted}}>{h.category} · racha {habitStreak(h.id)} días</div></div>
-                      <div style={{fontSize:10,fontWeight:900,color:done?theme.text:theme.textMuted}}>{done?'Hecho':'Marcar'}</div>
-                    </button>;})}
+                      <div style={{display:'flex',alignItems:'center',gap:5,flexShrink:0}}>
+                        {!isMobile && <div style={{fontSize:10,color:theme.textMuted,fontWeight:800,marginRight:2}}>{h.isBad?'Evitar hoy':(done?'Hecho':'Pendiente')}</div>}
+                        <button type='button' title='Editar hábito' onClick={(e)=>{e.stopPropagation();openEditHabitModal(h);}} style={{width:29,height:29,padding:0,borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:'transparent',color:theme.textMuted,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><Edit3 size={13}/></button>
+                        <button type='button' title='Eliminar hábito' onClick={(e)=>{e.stopPropagation();deleteHabit(h);}} style={{width:29,height:29,padding:0,borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:'transparent',color:theme.textMuted,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><Trash2 size={13}/></button>
+                      </div>
+                    </div>})}
                   </div>}
                 </div>
               </div>
@@ -3537,8 +3626,8 @@ export default function App() {
       {showHabitModal && (
         <div style={{ position:'fixed', inset:0, backgroundColor:'rgba(0,0,0,.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:300, padding:16 }}>
           <div style={{ backgroundColor:theme.card, border:`1px solid ${theme.cardBorder}`, borderRadius:20, width:'100%', maxWidth:500, maxHeight:'92vh', overflowY:'auto', padding:20 }}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div><h2 style={{fontSize:17,fontWeight:900,margin:0}}>Nuevo Hábito</h2><div style={{fontSize:10,color:theme.textMuted,marginTop:3}}>Configúralo para que LifeOS sepa cómo medirlo.</div></div><button type='button' onClick={()=>setShowHabitModal(false)} style={{background:'none',border:0,color:theme.textMuted,cursor:'pointer'}}><X size={19}/></button></div>
-            <form onSubmit={(e)=>{e.preventDefault();if(!newHabitName.trim())return;setHabits(prev=>[...prev,{id:Date.now(),name:newHabitName.trim(),category:newHabitCat,icon:newHabitIcon,streak:0,completed:false,frequency:newHabitFrequency,weeklyTarget:newHabitFrequency==='weekly'?Math.min(7,Math.max(1,Number(newHabitWeeklyTarget)||1)):7,isBad:newHabitIsBad,hasEndDate:newHabitHasEndDate,endDate:newHabitHasEndDate?newHabitEndDate:''}]);setNewHabitName('');setNewHabitIcon('🏋️');setNewHabitCat('Salud');setNewHabitFrequency('daily');setNewHabitWeeklyTarget('3');setNewHabitIsBad(false);setNewHabitHasEndDate(false);setNewHabitEndDate('');setShowHabitModal(false);setHabitSubTab('dia');}} style={{display:'flex',flexDirection:'column',gap:11}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div><h2 style={{fontSize:17,fontWeight:900,margin:0}}>{editingHabitId !== null ? 'Editar Hábito' : 'Nuevo Hábito'}</h2><div style={{fontSize:10,color:theme.textMuted,marginTop:3}}>{editingHabitId !== null ? 'Los cambios conservan tu historial y tu racha.' : 'Configúralo para que LifeOS sepa cómo medirlo.'}</div></div><button type='button' onClick={()=>{setShowHabitModal(false);resetHabitForm();}} style={{background:'none',border:0,color:theme.textMuted,cursor:'pointer'}}><X size={19}/></button></div>
+            <form onSubmit={(e)=>{e.preventDefault();if(!newHabitName.trim())return;const habitData={name:newHabitName.trim(),category:newHabitCat,icon:newHabitIcon,frequency:newHabitFrequency,weeklyTarget:newHabitFrequency==='weekly'?Math.min(7,Math.max(1,Number(newHabitWeeklyTarget)||1)):7,isBad:newHabitIsBad,hasEndDate:newHabitHasEndDate,endDate:newHabitHasEndDate?newHabitEndDate:''};if(editingHabitId!==null){setHabits(prev=>prev.map(h=>h.id===editingHabitId?{...h,...habitData}:h));}else{setHabits(prev=>[...prev,{id:Date.now(),...habitData,streak:0,completed:false}]);}setShowHabitModal(false);resetHabitForm();setHabitSubTab('dia');}} style={{display:'flex',flexDirection:'column',gap:11}}>
               <input type='text' placeholder='Ej. Entrenar 45 min' required value={newHabitName} onChange={e=>setNewHabitName(e.target.value)} style={{width:'100%',boxSizing:'border-box',padding:10,borderRadius:9,background:theme.card,border:`1px solid ${theme.cardBorder}`,color:theme.text}}/>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}><input type='text' placeholder='Categoría' value={newHabitCat} onChange={e=>setNewHabitCat(e.target.value)} style={{width:'100%',boxSizing:'border-box',padding:10,borderRadius:9,background:theme.card,border:`1px solid ${theme.cardBorder}`,color:theme.text}}/><div><div style={{fontSize:10,color:theme.textMuted,fontWeight:900,marginBottom:5}}>FRECUENCIA</div><select value={newHabitFrequency} onChange={e=>setNewHabitFrequency(e.target.value as any)} style={{width:'100%',padding:10,borderRadius:9,background:theme.card,border:`1px solid ${theme.cardBorder}`,color:theme.text}}><option value='daily'>Todos los días</option><option value='weekly'>Semanal</option></select></div></div>
               {newHabitFrequency==='weekly' && <div><label style={{fontSize:10,color:theme.textMuted,fontWeight:900}}>OBJETIVO SEMANAL</label><input type='number' min='1' max='7' value={newHabitWeeklyTarget} onChange={e=>setNewHabitWeeklyTarget(e.target.value)} style={{display:'block',width:100,marginTop:4,padding:9,borderRadius:9,background:theme.card,border:`1px solid ${theme.cardBorder}`,color:theme.text}}/><div style={{fontSize:9,color:theme.textMuted,marginTop:3}}>Cuántas veces quieres cumplirlo por semana.</div></div>}
@@ -3546,7 +3635,7 @@ export default function App() {
               <label style={{display:'flex',alignItems:'center',gap:8,fontSize:11,fontWeight:800}}><input type='checkbox' checked={newHabitIsBad} onChange={e=>setNewHabitIsBad(e.target.checked)} /> Es un hábito que quiero dejar / evitar</label>
               <label style={{display:'flex',alignItems:'center',gap:8,fontSize:11,fontWeight:800}}><input type='checkbox' checked={newHabitHasEndDate} onChange={e=>setNewHabitHasEndDate(e.target.checked)} /> Tiene fecha de fin</label>
               {newHabitHasEndDate && <input type='date' value={newHabitEndDate} onChange={e=>setNewHabitEndDate(e.target.value)} style={{width:'100%',boxSizing:'border-box',padding:10,borderRadius:9,background:theme.card,border:`1px solid ${theme.cardBorder}`,color:theme.text}}/>}
-              <button type='submit' style={{padding:11,border:0,borderRadius:10,background:theme.text,color:darkMode?'#090909':'#fff',fontWeight:900}}>Crear Hábito</button>
+              <button type='submit' style={{padding:11,border:0,borderRadius:10,background:theme.text,color:darkMode?'#090909':'#fff',fontWeight:900}}>{editingHabitId !== null ? 'Guardar cambios' : 'Crear Hábito'}</button>
             </form>
           </div>
         </div>
