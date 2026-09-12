@@ -23,6 +23,7 @@ import {
   ArrowUpRight, 
   ArrowDownRight, 
   ChevronLeft, 
+  ChevronRight,
   Menu, 
   Zap, 
   Clock, 
@@ -340,6 +341,12 @@ interface ScheduleBlock {
   room: string;
   color: string;
   semester: number;
+  source?: 'manual' | 'ses_uchile';
+  externalCourseCode?: number;
+  externalSection?: number;
+  externalPeriod?: string;
+  externalBlockKey?: string;
+  roomCandidates?: string[];
 }
 
 interface Subject {
@@ -410,6 +417,47 @@ interface AcademicTask {
   addToCalendar?: boolean;
   evaluationId?: number;
   reminder?: 'none' | '1h' | '1d' | '1w' | 'daily' | 'weekly';
+  source?: 'manual' | 'ses_uchile';
+  externalId?: number;
+  externalPeriod?: string;
+  externalUpdatedAt?: string;
+}
+
+interface SesEvaluation {
+  id: number;
+  periodo?: string | null;
+  semana?: number | null;
+  dia?: string | null;
+  inicio?: string | null;
+  termino?: string | null;
+  sala?: string | null;
+  asignatura?: string | null;
+  nivel?: number | null;
+  tipo?: string | null;
+  numero?: number | null;
+  unidades?: string | null;
+  docente?: string | null;
+  ponderacion?: number | string | null;
+  f?: string | null;
+  b?: string | null;
+  q?: string | null;
+  i?: string | null;
+  created_at?: string | null;
+}
+
+interface SesScheduleRow {
+  CURS_CODIGO?: number | string | null;
+  CURS_C_SEM?: number | string | null;
+  CURS_SECCION?: number | string | null;
+  RAMO_NOMBRE?: string | null;
+  PLA_NOMBRE?: string | null;
+  HOR_DIA?: string | null;
+  HOR_H_INI?: string | null;
+  HOR_H_FIN?: string | null;
+  SAL_NOMBRE?: string | null;
+  CARRERA?: string | null;
+  SEMESTRE?: number | string | null;
+  CAPACIDAD?: number | string | null;
 }
 
 interface PersonalTodo {
@@ -657,6 +705,14 @@ const LIFEOS_V9_CSS = `
   .lifeos-dashboard-footer-card span:last-child { display:block; margin-top:3px; color:var(--lifeos-muted, #8e8e93); font-size:9px; }
   .lifeos-dashboard-footer-card button { display:flex; align-items:center; gap:5px; flex-shrink:0; border:1px solid var(--lifeos-card-border, #27272a); background:var(--lifeos-card, #141416); color:var(--lifeos-text, #f4f4f5); border-radius:8px; padding:8px 10px; font-size:9px; font-weight:900; cursor:pointer; }
   .lifeos-dashboard .lifeos-span-2 { min-width:0; }
+  .lifeos-music-card { overflow:hidden; position:relative; }
+  .lifeos-music-layout { display:grid; grid-template-columns:88px minmax(0,1fr); gap:14px; align-items:center; }
+  .lifeos-vinyl-wrap { width:78px; height:78px; display:flex; align-items:center; justify-content:center; }
+  .lifeos-vinyl { width:72px; height:72px; border-radius:50%; background:repeating-radial-gradient(circle at center,#0b0b0d 0 7px,#18181b 8px 10px,#0a0a0b 11px 15px); border:1px solid #2b2b2f; box-shadow:0 8px 24px rgba(0,0,0,.28), inset 0 0 0 1px rgba(255,255,255,.03); position:relative; animation:lifeos-vinyl-spin 5.5s linear infinite; }
+  .lifeos-vinyl::before { content:'⚡'; position:absolute; inset:50% auto auto 50%; transform:translate(-50%,-50%); width:28px; height:28px; border-radius:50%; background:#f5f5f5; color:#09090b; display:flex; align-items:center; justify-content:center; font-size:14px; line-height:28px; text-align:center; box-shadow:0 0 0 4px #111113; }
+  .lifeos-music-frame { width:100%; height:82px; border:0; border-radius:10px; display:block; background:#0d0d0f; }
+  @keyframes lifeos-vinyl-spin { to { transform:rotate(360deg); } }
+
   :root { --lifeos-card-bg: #141416; --lifeos-card-border:#27272a; --lifeos-text:#f4f4f5; --lifeos-muted:#8e8e93; --lifeos-card:#141416; }
 
   @media (max-width: 639px) {
@@ -680,6 +736,10 @@ const LIFEOS_V9_CSS = `
     .lifeos-upcoming-row > span { white-space:normal; text-align:right; }
     .lifeos-dashboard-footer-card { align-items:flex-start; flex-direction:column; }
     .lifeos-dashboard-footer-card button { width:100%; justify-content:center; }
+    .lifeos-music-layout { grid-template-columns:64px minmax(0,1fr); gap:10px; }
+    .lifeos-vinyl-wrap { width:58px; height:58px; }
+    .lifeos-vinyl { width:54px; height:54px; }
+    .lifeos-music-frame { height:80px; }
   }
 `;
 
@@ -763,13 +823,40 @@ export default function App() {
   const [showBookmarkModal, setShowBookmarkModal] = useState(false);
   const [calendarViewMode, setCalendarViewMode] = useState<'semanal' | 'mensual'>('semanal');
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [masterCalendarCursorDate, setMasterCalendarCursorDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
   const [studentName, setStudentName] = useState<string>(() => localStorage.getItem('lifeos_student_name') || 'Francisco');
   const [currentSemesterName, setCurrentSemesterName] = useState<string>(() => localStorage.getItem('lifeos_sem_name') || 'Semestre 1 - 2027');
   const [careerName, setCareerName] = useState<string>(() => localStorage.getItem('lifeos_career_name') || 'Química y Farmacia — Universidad de Chile');
   const [careerYears, setCareerYears] = useState<number>(() => Number(localStorage.getItem('lifeos_career_years')) || 5.5);
   const [currentSemesterNumber, setCurrentSemesterNumber] = useState<number>(() => Number(localStorage.getItem('lifeos_current_sem_num')) || 1);
-  const [spotifyEmbedUrl] = useState<string>(() => localStorage.getItem('lifeos_spotify') || 'https://open.spotify.com/embed/playlist/37i9dQZF1DX8Uebhn9wzrS?utm_source=generator&theme=0');
+  const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState<string>(() => localStorage.getItem('lifeos_spotify') || 'https://open.spotify.com/playlist/37i9dQZF1DX8Uebhn9wzrS');
+  const [musicWidgetEnabled, setMusicWidgetEnabled] = useState<boolean>(() => localStorage.getItem('lifeos_music_widget_enabled') !== 'false');
+
+  // SES UChile: por defecto queda en modo de prueba con 2026-2.
+  // Cuando empieces la carrera, puedes activar el período automático (2027-1 para semestre 1).
+  const [sesTestPeriod, setSesTestPeriod] = useState<string>(() => localStorage.getItem('lifeos_ses_test_period') || '2026-2');
+  const [sesUseAutomaticPeriod, setSesUseAutomaticPeriod] = useState<boolean>(() => localStorage.getItem('lifeos_ses_auto_period') === 'true');
+  const [sesEvaluations, setSesEvaluations] = useState<SesEvaluation[]>([]);
+  const [sesStatus, setSesStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+  const [sesMessage, setSesMessage] = useState<string>('');
+  const [sesLastChecked, setSesLastChecked] = useState<string>('');
+
+  // Horario oficial SES Q&F. Se consulta el endpoint público y se filtra por el mismo período de SES.
+  const [sesScheduleRows, setSesScheduleRows] = useState<SesScheduleRow[]>([]);
+  const [sesScheduleStatus, setSesScheduleStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+  const [sesScheduleMessage, setSesScheduleMessage] = useState<string>('');
+  const [sesScheduleLastChecked, setSesScheduleLastChecked] = useState<string>('');
+  const [sesScheduleRoomChoices, setSesScheduleRoomChoices] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('lifeos_ses_schedule_room_choices') || '{}'); } catch { return {}; }
+  });
+  const [sesScheduleSectionChoices, setSesScheduleSectionChoices] = useState<Record<string, number>>(() => {
+    try { return JSON.parse(localStorage.getItem('lifeos_ses_schedule_section_choices') || '{}'); } catch { return {}; }
+  });
+  const [sesScheduleBackup, setSesScheduleBackup] = useState<Record<string, ScheduleBlock[]>>(() => {
+    try { return JSON.parse(localStorage.getItem('lifeos_ses_schedule_backup') || '{}'); } catch { return {}; }
+  });
+  const [sesClassNotificationsEnabled, setSesClassNotificationsEnabled] = useState<boolean>(() => localStorage.getItem('lifeos_ses_class_notifications') !== 'false');
 
   const [semStartDate, setSemStartDate] = useState<string>(() => localStorage.getItem('lifeos_sem_start') || '2027-03-01');
   const [semEndDate, setSemEndDate] = useState<string>(() => localStorage.getItem('lifeos_sem_end') || '2027-07-15');
@@ -835,6 +922,25 @@ export default function App() {
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(() => {
     try { return localStorage.getItem('lifeos_notifications_enabled') === 'true'; } catch { return false; }
   });
+
+  // Centro de avisos por correo. Los ajustes se guardan dentro del snapshot LifeOS,
+  // por lo que el proceso programado de Supabase puede leerlos aunque la app esté cerrada.
+  const [emailCenterEnabled, setEmailCenterEnabled] = useState<boolean>(() => localStorage.getItem('lifeos_email_center_enabled') === 'true');
+  const [emailAddress, setEmailAddress] = useState<string>(() => localStorage.getItem('lifeos_email_address') || '');
+  const [emailDailyEnabled, setEmailDailyEnabled] = useState<boolean>(() => localStorage.getItem('lifeos_email_daily_enabled') !== 'false');
+  const [emailDailyTime, setEmailDailyTime] = useState<string>(() => localStorage.getItem('lifeos_email_daily_time') || '07:00');
+  const [emailClassEnabled, setEmailClassEnabled] = useState<boolean>(() => localStorage.getItem('lifeos_email_class_enabled') !== 'false');
+  const [emailClassMinutes, setEmailClassMinutes] = useState<number>(() => Number(localStorage.getItem('lifeos_email_class_minutes')) || 20);
+  const [emailEvaluationEnabled, setEmailEvaluationEnabled] = useState<boolean>(() => localStorage.getItem('lifeos_email_evaluation_enabled') !== 'false');
+  const [emailEvaluationOffsets, setEmailEvaluationOffsets] = useState<number[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('lifeos_email_evaluation_offsets') || '[24,2]');
+      return Array.isArray(saved) && saved.length ? saved.map(Number).filter((n:number)=>Number.isFinite(n) && n>0) : [24,2];
+    } catch { return [24,2]; }
+  });
+  const [emailTestStatus, setEmailTestStatus] = useState<'idle' | 'sending' | 'ok' | 'error'>('idle');
+  const [emailTestMessage, setEmailTestMessage] = useState<string>('');
+
   const [taskReminder, setTaskReminder] = useState<'none' | '1h' | '1d' | '1w' | 'daily' | 'weekly'>('none');
   const [todoReminder, setTodoReminder] = useState<'none' | '1h' | '1d' | '1w' | 'daily' | 'weekly'>('none');
 
@@ -1115,6 +1221,13 @@ export default function App() {
       localStorage.setItem('lifeos_bookmarks', JSON.stringify(bookmarks));
       localStorage.setItem('lifeos_curriculum', JSON.stringify(curriculum));
       localStorage.setItem('lifeos_spotify', spotifyEmbedUrl);
+      localStorage.setItem('lifeos_music_widget_enabled', String(musicWidgetEnabled));
+      localStorage.setItem('lifeos_ses_test_period', sesTestPeriod);
+      localStorage.setItem('lifeos_ses_auto_period', String(sesUseAutomaticPeriod));
+      localStorage.setItem('lifeos_ses_schedule_room_choices', JSON.stringify(sesScheduleRoomChoices));
+      localStorage.setItem('lifeos_ses_schedule_section_choices', JSON.stringify(sesScheduleSectionChoices));
+      localStorage.setItem('lifeos_ses_schedule_backup', JSON.stringify(sesScheduleBackup));
+      localStorage.setItem('lifeos_ses_class_notifications', String(sesClassNotificationsEnabled));
       localStorage.setItem('lifeos_accounts_list', JSON.stringify(accountsList));
       localStorage.setItem('lifeos_transactions', JSON.stringify(transactions));
       localStorage.setItem('lifeos_saving_goals', JSON.stringify(savingGoals));
@@ -1126,11 +1239,19 @@ export default function App() {
       localStorage.setItem('lifeos_shopping_items', JSON.stringify(shoppingItems));
       localStorage.setItem('lifeos_habit_log', JSON.stringify(habitLog));
       localStorage.setItem('lifeos_notifications_enabled', String(notificationsEnabled));
+      localStorage.setItem('lifeos_email_center_enabled', String(emailCenterEnabled));
+      localStorage.setItem('lifeos_email_address', emailAddress.trim());
+      localStorage.setItem('lifeos_email_daily_enabled', String(emailDailyEnabled));
+      localStorage.setItem('lifeos_email_daily_time', emailDailyTime);
+      localStorage.setItem('lifeos_email_class_enabled', String(emailClassEnabled));
+      localStorage.setItem('lifeos_email_class_minutes', String(Math.max(1, Math.min(180, Number(emailClassMinutes) || 20))));
+      localStorage.setItem('lifeos_email_evaluation_enabled', String(emailEvaluationEnabled));
+      localStorage.setItem('lifeos_email_evaluation_offsets', JSON.stringify(emailEvaluationOffsets));
       localStorage.setItem('lifeos_career_seed_version', LIFEOS_CAREER_SEED_VERSION);
     } catch (e) {
       console.error(e);
     }
-  }, [darkMode, studentName, currentSemesterName, careerName, careerYears, currentSemesterNumber, dashboardAccountFilter, dashboardBackground, soundsEnabled, semStartDate, semEndDate, semesterDateConfig, academicBreaks, bookmarks, curriculum, spotifyEmbedUrl, accountsList, transactions, savingGoals, subjects, archivedSemesters, habits, habitLog, academicTasks, personalTodos, shoppingItems, notificationsEnabled]);
+  }, [darkMode, studentName, currentSemesterName, careerName, careerYears, currentSemesterNumber, dashboardAccountFilter, dashboardBackground, soundsEnabled, semStartDate, semEndDate, semesterDateConfig, academicBreaks, bookmarks, curriculum, spotifyEmbedUrl, musicWidgetEnabled, sesTestPeriod, sesUseAutomaticPeriod, sesScheduleRoomChoices, sesScheduleSectionChoices, sesScheduleBackup, sesClassNotificationsEnabled, accountsList, transactions, savingGoals, subjects, archivedSemesters, habits, habitLog, academicTasks, personalTodos, shoppingItems, notificationsEnabled, emailCenterEnabled, emailAddress, emailDailyEnabled, emailDailyTime, emailClassEnabled, emailClassMinutes, emailEvaluationEnabled, emailEvaluationOffsets]);
 
   const runCloudSync = async (mode: 'auto' | 'push' | 'pull' = 'auto') => {
     if (!cloudConfigured()) {
@@ -1283,6 +1404,47 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (!emailAddress.trim() && cloudSession?.user?.email) setEmailAddress(String(cloudSession.user.email));
+  }, [cloudSession?.user?.email]);
+
+  const sendLifeOSEmailTest = async () => {
+    if (!emailAddress.trim()) {
+      setEmailTestStatus('error');
+      setEmailTestMessage('Escribe el correo donde quieres recibir los avisos.');
+      return;
+    }
+    if (!cloudConfigured()) {
+      setEmailTestStatus('error');
+      setEmailTestMessage('Primero configura Supabase; el correo automático usa tu nube LifeOS.');
+      return;
+    }
+    setEmailTestStatus('sending');
+    setEmailTestMessage('');
+    try {
+      const session = await ensureCloudSession();
+      if (!session?.access_token) throw new Error('Inicia sesión en LifeOS Cloud antes de probar el correo.');
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/lifeos-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_PUBLISHABLE_KEY,
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ mode: 'test', email: emailAddress.trim(), name: studentName })
+      });
+      const raw = await response.text();
+      let payload: any = null;
+      try { payload = raw ? JSON.parse(raw) : null; } catch { payload = raw; }
+      if (!response.ok) throw new Error(String(payload?.error || payload?.message || `Error ${response.status}`));
+      setEmailTestStatus('ok');
+      setEmailTestMessage('Correo de prueba enviado. Revisa tu bandeja de entrada y spam.');
+    } catch (error:any) {
+      setEmailTestStatus('error');
+      setEmailTestMessage(error?.message || 'No se pudo enviar el correo de prueba.');
+    }
+  };
+
+  useEffect(() => {
     if (!notificationsEnabled || typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') return;
     const run = () => {
       const now = new Date();
@@ -1328,12 +1490,34 @@ export default function App() {
           notify(`todo_${t.id}_weekly_${now.toISOString().slice(0,10)}`, `LifeOS · ${t.title}`, `Recordatorio semanal. Vence ${t.dueDate}.`);
         }
       });
+
+      // Aviso rápido de clases oficiales SES. Funciona mientras LifeOS/PWA esté activo;
+      // el Web Push con la app totalmente cerrada se puede añadir como siguiente capa.
+      if (sesClassNotificationsEnabled) {
+        const today = formatLocalDate(now);
+        const dayName = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][now.getDay()];
+        subjects.forEach(subject => {
+          (subject.scheduleBlocks || []).filter(block => block.source === 'ses_uchile' && block.day === dayName && isScheduleBlockActiveOnDate(block, today)).forEach(block => {
+            const due = getTaskDate(today, block.startTime);
+            if (!due) return;
+            const diff = due.getTime() - now.getTime();
+            if (diff > 0 && diff <= 20 * 60 * 1000) {
+              const roomText = block.room && block.room !== 'Sala por confirmar' ? ` · 📍 ${block.room}` : ' · Sala por confirmar';
+              notify(
+                `sesclass_${today}_${subject.id}_${block.externalBlockKey || block.id}_20m`,
+                `LifeOS · ${subject.name} en 20 min`,
+                `${block.startTime}–${block.endTime}${roomText}`
+              );
+            }
+          });
+        });
+      }
       try { localStorage.setItem('lifeos_sent_notifications', JSON.stringify(sent)); } catch {}
     };
     run();
     const timer = setInterval(run, 60000);
     return () => clearInterval(timer);
-  }, [notificationsEnabled, academicTasks, personalTodos]);
+  }, [notificationsEnabled, academicTasks, personalTodos, subjects, sesClassNotificationsEnabled]);
 
   // --- MOTOR ACADÉMICO CHILE (CÁLCULOS + METAS REALES) ---
   const calculateSubjectMetrics = (sub: Subject) => {
@@ -1628,126 +1812,543 @@ export default function App() {
     return `${y}-${m}-${d}`;
   };
 
+
+  // Permite probar horarios de un período histórico (por ejemplo 2026-2) aunque tu semestre real esté configurado para 2027.
+  // Los feriados, recesos y paros explícitos siguen anulando la clase.
+  const dateBelongsToSesPeriod = (dateStr: string, period?: string) => {
+    const match = String(period || '').match(/^(\d{4})-([12])$/);
+    const dateMatch = String(dateStr || '').match(/^(\d{4})-(\d{2})-/);
+    if (!match || !dateMatch) return false;
+    const yearMatches = Number(match[1]) === Number(dateMatch[1]);
+    const month = Number(dateMatch[2]);
+    const term = Number(match[2]);
+    return yearMatches && (term === 1 ? month >= 3 && month <= 7 : month >= 8 && month <= 12);
+  };
+
+  const hasExplicitNoClassReason = (dateStr: string) => Boolean(
+    CHILE_HOLIDAYS_2026[dateStr] || academicBreaks.some(b => dateStr >= b.startDate && dateStr <= b.endDate)
+  );
+
+  const isScheduleBlockActiveOnDate = (block: ScheduleBlock, dateStr: string) => {
+    if (getDateAcademicStatus(dateStr).type === 'clases') return true;
+    return block.source === 'ses_uchile' && dateBelongsToSesPeriod(dateStr, block.externalPeriod) && !hasExplicitNoClassReason(dateStr);
+  };
+
   const dateFromLocalString = (date: string) => {
     const [y, m, d] = date.split('-').map(Number);
     return new Date(y, (m || 1) - 1, d || 1);
   };
 
-  const escapeIcsText = (value: string) => value
-    .replace(/\\/g, '\\\\')
-    .replace(/\n/g, '\\n')
-    .replace(/,/g, '\\,')
-    .replace(/;/g, '\\;');
+  const getMusicEmbed = (input: string): { url: string; provider: 'spotify' | 'youtube'; kind: string } | null => {
+    const raw = (input || '').trim();
+    if (!raw) return null;
+    try {
+      const url = new URL(raw);
+      const host = url.hostname.toLowerCase().replace(/^www\./, '');
 
-  const icsDateTime = (date: string, time = '09:00') => {
-    const cleanDate = date.replace(/-/g, '');
-    const [h = '09', m = '00'] = time.split(':');
-    return `${cleanDate}T${h.padStart(2, '0')}${m.padStart(2, '0')}00`;
+      // Spotify suele agregar /intl-es/ (u otro idioma) a los enlaces compartidos.
+      if (host === 'open.spotify.com') {
+        let parts = url.pathname.split('/').filter(Boolean);
+        if (parts[0]?.toLowerCase().startsWith('intl-')) parts = parts.slice(1);
+        if (parts[0] === 'embed') parts = parts.slice(1);
+        const type = (parts[0] || '').toLowerCase();
+        const id = (parts[1] || '').split('?')[0];
+        if (type && id && ['playlist','album','track','artist','show','episode'].includes(type)) {
+          return {
+            url: `https://open.spotify.com/embed/${type}/${encodeURIComponent(id)}?utm_source=generator&theme=0`,
+            provider: 'spotify',
+            kind: type
+          };
+        }
+        return null;
+      }
+
+      // Los enlaces cortos de Spotify son redirecciones y no son un reproductor embebible directo.
+      if (host === 'spotify.link' || host === 'spoti.fi') return null;
+
+      if (host === 'youtu.be') {
+        const id = url.pathname.split('/').filter(Boolean)[0];
+        const list = url.searchParams.get('list');
+        if (id) return {
+          url: `https://www.youtube.com/embed/${encodeURIComponent(id)}${list ? `?list=${encodeURIComponent(list)}` : ''}`,
+          provider: 'youtube',
+          kind: 'video'
+        };
+      }
+
+      if (host === 'youtube.com' || host === 'music.youtube.com' || host === 'youtube-nocookie.com') {
+        const list = url.searchParams.get('list');
+        const video = url.searchParams.get('v');
+        const parts = url.pathname.split('/').filter(Boolean);
+
+        if (parts[0] === 'embed' && parts[1]) return {
+          url: `https://www.youtube.com/embed/${encodeURIComponent(parts[1])}${list ? `?list=${encodeURIComponent(list)}` : ''}`,
+          provider: 'youtube',
+          kind: 'video'
+        };
+        if ((parts[0] === 'shorts' || parts[0] === 'live') && parts[1]) return {
+          url: `https://www.youtube.com/embed/${encodeURIComponent(parts[1])}${list ? `?list=${encodeURIComponent(list)}` : ''}`,
+          provider: 'youtube',
+          kind: 'video'
+        };
+        if (video) return {
+          url: `https://www.youtube.com/embed/${encodeURIComponent(video)}${list ? `?list=${encodeURIComponent(list)}` : ''}`,
+          provider: 'youtube',
+          kind: 'video'
+        };
+        if (list) return {
+          url: `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(list)}`,
+          provider: 'youtube',
+          kind: 'playlist'
+        };
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
   };
 
-  const addMinutesToLocalDateTime = (date: string, time: string, minutes: number) => {
-    const [y, mo, d] = date.split('-').map(Number);
-    const [h, m] = time.split(':').map(Number);
-    const dt = new Date(y, (mo || 1) - 1, d || 1, h || 0, m || 0, 0);
-    dt.setMinutes(dt.getMinutes() + minutes);
-    const ds = formatLocalDate(dt).replace(/-/g, '');
-    return `${ds}T${String(dt.getHours()).padStart(2, '0')}${String(dt.getMinutes()).padStart(2, '0')}00`;
+
+  const sesPeriodForSemester = (semester: number) => {
+    const safeSemester = Math.max(1, Math.min(11, Number(semester) || 1));
+    const year = 2027 + Math.floor((safeSemester - 1) / 2);
+    const term = safeSemester % 2 === 1 ? 1 : 2;
+    return `${year}-${term}`;
   };
 
-  const buildIcsAlarm = (reminder?: AcademicTask['reminder'] | PersonalTodo['reminder']) => {
-    const trigger = reminder === '1h' ? '-PT1H' : reminder === '1d' ? '-P1D' : reminder === '1w' ? '-P7D' : '';
-    return trigger ? `BEGIN:VALARM\r\nTRIGGER:${trigger}\r\nACTION:DISPLAY\r\nDESCRIPTION:Recordatorio LifeOS\r\nEND:VALARM\r\n` : '';
+  const activeSesPeriod = sesUseAutomaticPeriod ? sesPeriodForSemester(currentSemesterNumber) : sesTestPeriod.trim();
+
+  const normalizeSesSubjectName = (value: string | null | undefined) => {
+    const stopWords = new Set(['de','del','la','las','el','los','para','y','en']);
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/&/g, ' y ')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .filter(token => !stopWords.has(token))
+      .join(' ');
   };
 
-  const downloadCalendarEvent = async (event: {
-    id: string; title: string; date: string; startTime?: string; endTime?: string; description?: string; reminder?: AcademicTask['reminder'] | PersonalTodo['reminder'];
-  }) => {
-    if (!event.date || event.date === 'Pronto') {
-      alert('Primero agrega una fecha para poder enviarlo al Calendario.');
+  const sesSubjectMap = new Map(subjects.map(subject => [normalizeSesSubjectName(subject.name), subject]));
+  const sesQfEvaluations = sesEvaluations.filter(ev => String(ev.f || '').toUpperCase() === 'F');
+  const sesMatchedEvaluations = sesQfEvaluations
+    .map(ev => ({ ev, subject: sesSubjectMap.get(normalizeSesSubjectName(ev.asignatura)) }))
+    .filter((row): row is { ev: SesEvaluation; subject: Subject } => Boolean(row.subject));
+
+  const validSesClock = (value: string | null | undefined) => {
+    const raw = String(value || '').trim();
+    const match = raw.match(/^(\d{1,2}):(\d{2})/);
+    if (!match) return undefined;
+    return `${String(Number(match[1])).padStart(2, '0')}:${match[2]}`;
+  };
+
+  // ===== SES HORARIOS Q&F =====
+  // El endpoint entrega módulos de 45 min. LifeOS agrupa módulos consecutivos del mismo ramo/sala
+  // para mostrar un bloque limpio, manteniendo sección, sala y código oficial del curso.
+  const sesSchedulePeriodNumber = Number(activeSesPeriod.replace('-', ''));
+  const sesSchedulePeriodRows = sesScheduleRows.filter(row => {
+    const period = Number(row.CURS_C_SEM);
+    const career = String(row.CARRERA || '').trim().toUpperCase();
+    const plan = normalizeSesSubjectName(row.PLA_NOMBRE);
+    return Number.isFinite(sesSchedulePeriodNumber) && period === sesSchedulePeriodNumber && (career === 'QF' || plan === 'quimica farmacia');
+  });
+
+  const sesScheduleMatchedRows = sesSchedulePeriodRows
+    .map(row => ({ row, subject: sesSubjectMap.get(normalizeSesSubjectName(row.RAMO_NOMBRE)) }))
+    .filter((item): item is { row: SesScheduleRow; subject: Subject } => Boolean(item.subject));
+
+  const sesScheduleSubjectSummaries: Array<{ subject: Subject; rows: SesScheduleRow[]; sections: number[]; selectedSection: number | null }> = subjects
+    .map(subject => {
+      const rows = sesScheduleMatchedRows.filter(item => item.subject.id === subject.id).map(item => item.row);
+      const sections: number[] = Array.from(new Set<number>(rows.map(row => Number(row.CURS_SECCION)).filter((value): value is number => Number.isFinite(value)))).sort((a: number,b: number)=>a-b);
+      const selected = Number(sesScheduleSectionChoices[String(subject.id)]);
+      const selectedSection = sections.includes(selected) ? selected : (sections.length === 1 ? sections[0] : null);
+      return { subject, rows, sections, selectedSection };
+    })
+    .filter(summary => summary.rows.length > 0);
+
+  const sesTimeToMinutes = (value: string | undefined) => {
+    const match = String(value || '').match(/^(\d{2}):(\d{2})$/);
+    return match ? Number(match[1]) * 60 + Number(match[2]) : NaN;
+  };
+
+  const sesScheduleGroups = (() => {
+    const exactSlots = new Map<string, {
+      subject: Subject;
+      courseCode: number;
+      section: number;
+      day: ScheduleBlock['day'];
+      startTime: string;
+      endTime: string;
+      rooms: Set<string>;
+    }>();
+    const allowedDays = new Set(['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']);
+
+    sesScheduleSubjectSummaries.forEach(summary => {
+      if (summary.selectedSection === null) return;
+      summary.rows.filter(row => Number(row.CURS_SECCION) === summary.selectedSection).forEach(row => {
+        const day = String(row.HOR_DIA || '').trim();
+        const startTime = validSesClock(row.HOR_H_INI);
+        const endTime = validSesClock(row.HOR_H_FIN);
+        const courseCode = Number(row.CURS_CODIGO);
+        if (!allowedDays.has(day) || !startTime || !endTime || !Number.isFinite(courseCode)) return;
+        const room = String(row.SAL_NOMBRE || '').trim() || 'Sala por confirmar';
+        const key = `${summary.subject.id}|${courseCode}|${summary.selectedSection}|${day}|${startTime}|${endTime}`;
+        const existing = exactSlots.get(key);
+        if (existing) existing.rooms.add(room);
+        else exactSlots.set(key, {
+          subject: summary.subject,
+          courseCode,
+          section: summary.selectedSection,
+          day: day as ScheduleBlock['day'],
+          startTime,
+          endTime,
+          rooms: new Set([room])
+        });
+      });
+    });
+
+    const dayOrder: Record<string, number> = { Lunes:1, Martes:2, Miércoles:3, Jueves:4, Viernes:5, Sábado:6 };
+    const slots = Array.from(exactSlots.values())
+      .map(slot => ({ ...slot, rooms: Array.from(slot.rooms).sort() }))
+      .sort((a,b) => a.subject.id-b.subject.id || dayOrder[a.day]-dayOrder[b.day] || sesTimeToMinutes(a.startTime)-sesTimeToMinutes(b.startTime));
+
+    const merged: Array<{
+      subject: Subject;
+      courseCode: number;
+      section: number;
+      day: ScheduleBlock['day'];
+      startTime: string;
+      endTime: string;
+      rooms: string[];
+    }> = [];
+    slots.forEach(slot => {
+      const prev = merged[merged.length - 1];
+      const sameRooms = prev && JSON.stringify(prev.rooms) === JSON.stringify(slot.rooms);
+      const gap = prev ? sesTimeToMinutes(slot.startTime) - sesTimeToMinutes(prev.endTime) : NaN;
+      if (prev && prev.subject.id === slot.subject.id && prev.courseCode === slot.courseCode && prev.section === slot.section && prev.day === slot.day && sameRooms && gap >= 0 && gap <= 15) {
+        prev.endTime = slot.endTime;
+      } else merged.push({ ...slot });
+    });
+
+    return merged.map(group => {
+      const roomChoiceKey = `${group.subject.id}|${group.courseCode}|${group.section}|${group.day}|${group.startTime}|${group.endTime}`;
+      const chosen = sesScheduleRoomChoices[roomChoiceKey];
+      const selectedRoom = group.rooms.length === 1 ? group.rooms[0] : (group.rooms.includes(chosen) ? chosen : '');
+      const externalBlockKey = `${group.courseCode}|${group.section}|${group.day}|${group.startTime}|${group.endTime}`;
+      return { ...group, roomChoiceKey, selectedRoom, externalBlockKey };
+    });
+  })();
+
+  const sesScheduleUnresolvedSections = sesScheduleSubjectSummaries.filter(item => item.sections.length > 1 && item.selectedSection === null).length;
+  const sesScheduleUnresolvedRooms = sesScheduleGroups.filter(group => group.rooms.length > 1 && !group.selectedRoom).length;
+
+  const fetchSesSchedule = async () => {
+    const period = activeSesPeriod;
+    if (!/^\d{4}-[12]$/.test(period)) {
+      setSesScheduleStatus('error');
+      setSesScheduleMessage('Usa un período con formato AAAA-1 o AAAA-2 antes de consultar el horario.');
       return;
     }
-
-    const startTime = event.startTime || '09:00';
-    const endValue = event.endTime
-      ? icsDateTime(event.date, event.endTime)
-      : addMinutesToLocalDateTime(event.date, startTime, 60);
-    const nowStamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-    const description = event.description ? `DESCRIPTION:${escapeIcsText(event.description)}\r\n` : '';
-    const ics = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//LifeOS//Calendario//ES',
-      'CALSCALE:GREGORIAN',
-      'METHOD:PUBLISH',
-      'BEGIN:VEVENT',
-      `UID:${event.id}@lifeos`,
-      `DTSTAMP:${nowStamp}`,
-      `DTSTART:${icsDateTime(event.date, startTime)}`,
-      `DTEND:${endValue}`,
-      `SUMMARY:${escapeIcsText(event.title)}`,
-      description.trimEnd(),
-      buildIcsAlarm(event.reminder).trimEnd(),
-      'END:VEVENT',
-      'END:VCALENDAR'
-    ].filter(Boolean).join('\r\n') + '\r\n';
-
-    const fileName = `LifeOS-${event.title.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ_-]+/g, '-').replace(/-+/g, '-').slice(0, 60) || 'evento'}.ics`;
-    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-
-    // En iPhone/iPad, especialmente cuando LifeOS está instalada como PWA,
-    // los enlaces con `download` pueden no hacer nada. Usamos la hoja de
-    // compartir nativa cuando Safari/iOS permite compartir archivos.
+    setSesScheduleStatus('loading');
+    setSesScheduleMessage('Consultando el horario oficial público de Química y Farmacia…');
     try {
-      const calendarFile = new File([ics], fileName, { type: 'text/calendar' });
-      const shareData = {
-        files: [calendarFile],
-        title: event.title,
-        text: 'Evento creado desde LifeOS'
-      };
-      const canShareFile = typeof navigator !== 'undefined'
-        && typeof navigator.share === 'function'
-        && (!navigator.canShare || navigator.canShare(shareData));
-
-      if (canShareFile) {
-        await navigator.share(shareData);
-        return;
-      }
+      const response = await fetch('https://www.ses.uchile.cl/api/horarios-quimica-farmacia', {
+        method: 'GET',
+        headers: { Accept: 'application/json' }
+      });
+      if (!response.ok) throw new Error(`SES respondió ${response.status}`);
+      const payload = await response.json();
+      if (!Array.isArray(payload)) throw new Error('La respuesta de horarios SES no tiene el formato esperado.');
+      const clean = payload.filter((item: any) => item && typeof item === 'object') as SesScheduleRow[];
+      setSesScheduleRows(clean);
+      setSesScheduleStatus('ok');
+      setSesScheduleLastChecked(new Date().toLocaleString('es-CL'));
+      const periodNumber = Number(period.replace('-', ''));
+      const periodCount = clean.filter(row => Number(row.CURS_C_SEM) === periodNumber).length;
+      setSesScheduleMessage(periodCount
+        ? `Conexión correcta. SES tiene ${periodCount} módulos de horario para ${period}; LifeOS los filtrará contra tus ramos activos.`
+        : `Conexión correcta, pero el endpoint todavía no publica módulos para ${period}. Esto es normal si el semestre aún no comienza.`);
     } catch (error: any) {
-      // Si el usuario cierra la hoja de compartir, no mostramos un error.
-      if (error?.name === 'AbortError') return;
-      console.warn('LifeOS: no se pudo abrir la hoja de compartir del calendario.', error);
+      setSesScheduleRows([]);
+      setSesScheduleStatus('error');
+      setSesScheduleMessage(`No se pudo consultar el horario SES: ${error?.message || 'error desconocido'}.`);
     }
-
-    // Fallback para escritorio y navegadores sin Web Share API de archivos.
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
 
-  const exportAcademicTaskToCalendar = (task: AcademicTask) => downloadCalendarEvent({
-    id: `academic-${task.id}`,
-    title: task.title,
-    date: task.dueDate,
-    startTime: task.startTime || '09:00',
-    endTime: task.endTime,
-    description: `${task.subject} · ${task.type}${task.weight ? ` · Ponderación ${task.weight}%` : ''}${task.notes ? `\n${task.notes}` : ''}`,
-    reminder: task.reminder
-  });
+  const importSesSchedule = () => {
+    if (sesScheduleGroups.length === 0) {
+      setSesScheduleMessage(sesScheduleUnresolvedSections > 0
+        ? 'Hay ramos con varias secciones. Selecciona tu sección antes de importar el horario.'
+        : 'No hay bloques de horario SES que coincidan con tus ramos activos para este período.');
+      return;
+    }
+    const period = activeSesPeriod;
+    const groupedBySubject = new Map<number, typeof sesScheduleGroups>();
+    sesScheduleGroups.forEach(group => groupedBySubject.set(group.subject.id, [...(groupedBySubject.get(group.subject.id) || []), group]));
+    const backup = { ...sesScheduleBackup };
+    let subjectsUpdated = 0;
+    let blocksImported = 0;
 
-  const exportTodoToCalendar = (todo: PersonalTodo) => downloadCalendarEvent({
-    id: `todo-${todo.id}`,
-    title: todo.title,
-    date: todo.dueDate,
-    startTime: todo.dueTime || '09:00',
-    description: `${todo.category} · Prioridad ${todo.priority} · To-Do de LifeOS`,
-    reminder: todo.reminder
-  });
+    setSubjects(prev => prev.map(subject => {
+      const groups = groupedBySubject.get(subject.id);
+      if (!groups?.length) return subject;
+      const backupKey = String(subject.id);
+      if (!backup[backupKey]) {
+        backup[backupKey] = (subject.scheduleBlocks || []).filter(block => block.source !== 'ses_uchile').map(block => ({ ...block }));
+      }
+      const existingSes = new Map<string, ScheduleBlock>((subject.scheduleBlocks || []).filter(block => block.source === 'ses_uchile' && block.externalBlockKey).map(block => [String(block.externalBlockKey), block] as [string, ScheduleBlock]));
+      const officialBlocks: ScheduleBlock[] = groups.map((group, index) => {
+        const previous = existingSes.get(group.externalBlockKey);
+        return {
+          id: previous?.id || Date.now() + subject.id * 100 + index,
+          day: group.day,
+          startTime: group.startTime,
+          endTime: group.endTime,
+          subjectName: subject.name,
+          room: group.selectedRoom || (group.rooms.length > 1 ? 'Sala por confirmar' : group.rooms[0] || 'Sala por confirmar'),
+          color: subject.color,
+          semester: subject.semesterInCurriculum,
+          source: 'ses_uchile',
+          externalCourseCode: group.courseCode,
+          externalSection: group.section,
+          externalPeriod: period,
+          externalBlockKey: group.externalBlockKey,
+          roomCandidates: group.rooms
+        };
+      });
+      subjectsUpdated += 1;
+      blocksImported += officialBlocks.length;
+      return { ...subject, classroom: officialBlocks[0]?.room || subject.classroom, scheduleBlocks: officialBlocks };
+    }));
+    setSesScheduleBackup(backup);
+    setSesScheduleMessage(`Horario SES listo: ${blocksImported} bloque${blocksImported === 1 ? '' : 's'} agrupado${blocksImported === 1 ? '' : 's'} en ${subjectsUpdated} ramo${subjectsUpdated === 1 ? '' : 's'}. ${sesScheduleUnresolvedRooms ? `${sesScheduleUnresolvedRooms} bloque(s) quedaron con sala por confirmar; puedes elegirla arriba y volver a importar.` : 'Todas las salas quedaron definidas.'}`);
+  };
+
+  const restoreManualSesSchedule = () => {
+    const backupKeys = Object.keys(sesScheduleBackup);
+    if (!backupKeys.length) {
+      setSesScheduleMessage('No hay un horario manual respaldado para restaurar.');
+      return;
+    }
+    if (!window.confirm('¿Restaurar el horario manual que tenías antes de importar SES? El horario oficial importado se quitará, pero tus ramos y notas no cambiarán.')) return;
+    setSubjects(prev => prev.map(subject => {
+      const saved = sesScheduleBackup[String(subject.id)];
+      return saved ? { ...subject, scheduleBlocks: saved.map(block => ({ ...block })) } : subject;
+    }));
+    setSesScheduleBackup({});
+    setSesScheduleMessage('Horario manual restaurado. Las evaluaciones SES, notas y demás datos no se tocaron.');
+  };
+
+  const mapSesTaskType = (tipo: string | null | undefined): AcademicTask['type'] => {
+    const key = normalizeSesSubjectName(tipo);
+    if (key.includes('examen')) return 'Examen';
+    if (key.includes('control')) return 'Control';
+    if (key.includes('laboratorio') || key.includes('practico')) return 'Laboratorio';
+    if (key.includes('proyecto')) return 'Proyecto';
+    if (key.includes('tarea') || key.includes('informe') || key.includes('trabajo')) return 'Tarea';
+    return 'Certamen'; // SES suele publicar "Prueba", que en LifeOS tratamos como evaluación mayor.
+  };
+
+  const sesTaskTitle = (ev: SesEvaluation) => {
+    const base = String(ev.tipo || 'Evaluación').trim() || 'Evaluación';
+    return ev.numero !== null && ev.numero !== undefined ? `${base} ${ev.numero}` : base;
+  };
+
+  // Vincula una evaluación publicada por SES con la evaluación configurada en Ramos & Notas.
+  // Ejemplo: "Prueba 1" de SES -> "Certamen 1" de LifeOS.
+  const sesEvaluationKind = (ev: SesEvaluation): Evaluation['type'] | null => {
+    const key = normalizeSesSubjectName(ev.tipo);
+    if (key.includes('examen')) return 'examen';
+    if (key.includes('control') || key.includes('test')) return 'control';
+    if (key.includes('laboratorio') || key.includes('practico') || key.includes('informe') || key.includes('trabajo') || key.includes('tarea')) return 'trabajo';
+    // En SES las evaluaciones mayores suelen aparecer como "Prueba".
+    if (key.includes('prueba') || key.includes('certamen') || key.includes('evaluacion')) return 'certamen';
+    return 'certamen';
+  };
+
+  const findSubjectEvaluationForSes = (ev: SesEvaluation, subject: Subject): Evaluation | undefined => {
+    const kind = sesEvaluationKind(ev);
+    if (!kind || kind === 'examen') return undefined;
+    const candidates = (subject.evaluations || []).filter(item => item.type === kind);
+    if (!candidates.length) return undefined;
+    const number = Number(ev.numero);
+    if (Number.isFinite(number) && number >= 1) {
+      const named = candidates.find(item => normalizeSesSubjectName(item.name).endsWith(` ${number}`));
+      if (named) return named;
+      if (candidates[number - 1]) return candidates[number - 1];
+    }
+    return candidates.length === 1 ? candidates[0] : undefined;
+  };
+
+  const findSubjectEvaluationForTask = (task: AcademicTask, subject: Subject): Evaluation | undefined => {
+    const evaluations = subject.evaluations || [];
+    if (task.evaluationId !== null && task.evaluationId !== undefined) {
+      const direct = evaluations.find(item => Number(item.id) === Number(task.evaluationId));
+      if (direct) return direct;
+    }
+    // Solo inferimos automáticamente para tareas provenientes de SES. Las tareas manuales no enlazadas quedan intactas.
+    if (task.source !== 'ses_uchile') return undefined;
+    const kind: Evaluation['type'] | null = task.type === 'Control'
+      ? 'control'
+      : task.type === 'Certamen'
+        ? 'certamen'
+        : (task.type === 'Laboratorio' || task.type === 'Tarea')
+          ? 'trabajo'
+          : null;
+    if (!kind) return undefined;
+    const candidates = evaluations.filter(item => item.type === kind);
+    if (!candidates.length) return undefined;
+    const numberMatch = String(task.title || '').match(/(\d+)\s*$/);
+    const number = numberMatch ? Number(numberMatch[1]) : NaN;
+    if (Number.isFinite(number) && number >= 1) {
+      const named = candidates.find(item => normalizeSesSubjectName(item.name).endsWith(` ${number}`));
+      if (named) return named;
+      if (candidates[number - 1]) return candidates[number - 1];
+    }
+    return candidates.length === 1 ? candidates[0] : undefined;
+  };
+
+  const fetchSesEvaluations = async () => {
+    const period = activeSesPeriod;
+    if (!/^\d{4}-[12]$/.test(period)) {
+      setSesStatus('error');
+      setSesMessage('Usa un período con formato AAAA-1 o AAAA-2, por ejemplo 2026-2.');
+      return;
+    }
+    setSesStatus('loading');
+    setSesMessage('Consultando el calendario público de la Secretaría de Estudios…');
+    try {
+      const response = await fetch(`https://www.ses.uchile.cl/api/evaluaciones?periodo=${encodeURIComponent(period)}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' }
+      });
+      if (!response.ok) throw new Error(`SES respondió ${response.status}`);
+      const payload = await response.json();
+      if (!Array.isArray(payload)) throw new Error('La respuesta de SES no tiene el formato esperado.');
+      const clean = payload.filter((item: any) => item && typeof item === 'object').map((item: any) => ({
+        ...item,
+        id: Number(item.id)
+      })) as SesEvaluation[];
+      setSesEvaluations(clean);
+      setSesStatus('ok');
+      setSesLastChecked(new Date().toLocaleString('es-CL'));
+      if (clean.length === 0) setSesMessage(`Conexión correcta. SES todavía no tiene evaluaciones publicadas para ${period}.`);
+      else setSesMessage(`Conexión correcta con SES para ${period}. Revisa las coincidencias antes de importar.`);
+    } catch (error: any) {
+      setSesEvaluations([]);
+      setSesStatus('error');
+      setSesMessage(`No se pudo consultar SES: ${error?.message || 'error desconocido'}.`);
+    }
+  };
+
+  const importSesMatchedEvaluations = () => {
+    if (sesMatchedEvaluations.length === 0) {
+      setSesMessage('No hay evaluaciones de SES que coincidan con tus ramos activos de LifeOS.');
+      return;
+    }
+    const period = activeSesPeriod;
+    let created = 0;
+    let updated = 0;
+    const next = [...academicTasks];
+    sesMatchedEvaluations.forEach(({ ev, subject }, index) => {
+      const externalId = Number(ev.id);
+      if (!Number.isFinite(externalId)) return;
+      const dueDate = String(ev.dia || '').slice(0, 10) || 'Pronto';
+      const linkedEvaluation = findSubjectEvaluationForSes(ev, subject);
+      const weightRaw = Number(ev.ponderacion);
+      const sesWeight = Number.isFinite(weightRaw) && weightRaw > 0 ? weightRaw : 0;
+      // Si el ramo ya tiene sus ponderaciones configuradas en Ramos & Notas, esa es la fuente principal.
+      // SES queda como respaldo cuando efectivamente informa una ponderación.
+      const resolvedWeight = linkedEvaluation && Number(linkedEvaluation.weight) > 0 ? Number(linkedEvaluation.weight) : sesWeight;
+      const incoming: Partial<AcademicTask> = {
+        title: sesTaskTitle(ev),
+        subject: subject.name,
+        dueDate,
+        startTime: validSesClock(ev.inicio),
+        endTime: validSesClock(ev.termino),
+        isExtracurricular: false,
+        type: mapSesTaskType(ev.tipo),
+        weight: resolvedWeight,
+        evaluationId: linkedEvaluation?.id,
+        addToCalendar: true,
+        source: 'ses_uchile',
+        externalId,
+        externalPeriod: String(ev.periodo || period),
+        externalUpdatedAt: String(ev.created_at || '')
+      };
+      const existingIndex = next.findIndex(task => task.source === 'ses_uchile' && Number(task.externalId) === externalId);
+      if (existingIndex >= 0) {
+        const existing = next[existingIndex];
+        next[existingIndex] = {
+          ...existing,
+          ...incoming,
+          notes: existing.notes || `Importado desde SES UChile · ${period}`
+        } as AcademicTask;
+        updated += 1;
+      } else {
+        next.push({
+          id: Date.now() + index,
+          title: incoming.title || 'Evaluación',
+          subject: incoming.subject || subject.name,
+          dueDate: incoming.dueDate || 'Pronto',
+          startTime: incoming.startTime,
+          endTime: incoming.endTime,
+          isExtracurricular: false,
+          type: incoming.type || 'Certamen',
+          weight: Number(incoming.weight) || 0,
+          notes: `Importado desde SES UChile · ${period}`,
+          completed: false,
+          addToCalendar: true,
+          reminder: 'none',
+          source: 'ses_uchile',
+          externalId,
+          externalPeriod: String(ev.periodo || period),
+          externalUpdatedAt: String(ev.created_at || '')
+        });
+        created += 1;
+      }
+    });
+    setAcademicTasks(next);
+    setSesMessage(`SES listo: ${created} evaluación${created === 1 ? '' : 'es'} nueva${created === 1 ? '' : 's'} y ${updated} actualizada${updated === 1 ? '' : 's'}. Puedes revisarlas en Estudios → Calendario.`);
+  };
+
+  const removeSesPeriodImports = () => {
+    const period = activeSesPeriod;
+    const count = academicTasks.filter(task => task.source === 'ses_uchile' && task.externalPeriod === period).length;
+    if (count === 0) {
+      setSesMessage(`No hay evaluaciones importadas desde SES para ${period}.`);
+      return;
+    }
+    if (!window.confirm(`¿Eliminar las ${count} evaluaciones importadas desde SES para ${period}? Tus evaluaciones creadas manualmente no se tocarán.`)) return;
+    setAcademicTasks(prev => prev.filter(task => !(task.source === 'ses_uchile' && task.externalPeriod === period)));
+    setSesMessage(`Se eliminaron las evaluaciones SES de ${period}. Tus datos manuales quedaron intactos.`);
+  };
+
+  // Mantiene las ponderaciones del calendario sincronizadas con Ramos & Notas.
+  // También migra automáticamente las evaluaciones SES importadas con v20, que todavía no tenían evaluationId.
+  useEffect(() => {
+    setAcademicTasks(prev => {
+      let changed = false;
+      const next = prev.map(task => {
+        if (task.source !== 'ses_uchile' && (task.evaluationId === null || task.evaluationId === undefined)) return task;
+        const subject = subjects.find(item => normalizeSesSubjectName(item.name) === normalizeSesSubjectName(task.subject));
+        if (!subject) return task;
+        const linked = findSubjectEvaluationForTask(task, subject);
+        if (!linked) return task;
+        const nextWeight = Number(linked.weight) || 0;
+        if (Number(task.evaluationId) === Number(linked.id) && Number(task.weight) === nextWeight) return task;
+        changed = true;
+        return { ...task, evaluationId: linked.id, weight: nextWeight };
+      });
+      return changed ? next : prev;
+    });
+  }, [subjects]);
 
   const shiftLocalDate = (date: Date, days: number) => {
     const copy = new Date(date);
@@ -2087,7 +2688,7 @@ export default function App() {
     .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority] || (a.dueDate || '').localeCompare(b.dueDate || ''));
 
   const todayDateObj = new Date();
-  const todayStr = todayDateObj.toISOString().split('T')[0];
+  const todayStr = formatLocalDate(todayDateObj);
   const currentTime12h = currentTime.toLocaleTimeString('es-CL', { hour: 'numeric', minute: '2-digit', hour12: true });
 
   const currentWeekDays = Array.from({ length: 7 }, (_, i) => {
@@ -2098,18 +2699,39 @@ export default function App() {
     return d;
   });
 
+  // El calendario pequeño del Dashboard sigue mostrando el mes actual.
   const currentYear = todayDateObj.getFullYear();
   const currentMonth = todayDateObj.getMonth();
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
   const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const startingDayOfWeek = firstDayOfMonth.getDay() === 0 ? 6 : firstDayOfMonth.getDay() - 1;
-
   const monthCalendarDates = Array.from({ length: daysInCurrentMonth }, (_, i) => new Date(currentYear, currentMonth, i + 1));
-  const classEvents = monthCalendarDates.flatMap(d => {
-    const dateStr = d.toISOString().split('T')[0];
-    if (getDateAcademicStatus(dateStr).type !== 'clases') return [];
+
+  // El Calendario Maestro tiene su propio cursor y puede viajar libremente entre semanas/meses.
+  const masterCalendarDateObj = dateFromLocalString(masterCalendarCursorDate);
+  const masterWeekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(masterCalendarDateObj);
+    const dayOfWeek = masterCalendarDateObj.getDay();
+    const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    d.setDate(masterCalendarDateObj.getDate() + distanceToMonday + i);
+    return d;
+  });
+  const masterYear = masterCalendarDateObj.getFullYear();
+  const masterMonth = masterCalendarDateObj.getMonth();
+  const masterFirstDayOfMonth = new Date(masterYear, masterMonth, 1);
+  const masterDaysInMonth = new Date(masterYear, masterMonth + 1, 0).getDate();
+  const masterStartingDayOfWeek = masterFirstDayOfMonth.getDay() === 0 ? 6 : masterFirstDayOfMonth.getDay() - 1;
+  const masterMonthCalendarDates = Array.from({ length: masterDaysInMonth }, (_, i) => new Date(masterYear, masterMonth, i + 1));
+
+  const calendarCoverageDates = Array.from(new Map(
+    [...monthCalendarDates, ...masterMonthCalendarDates, ...masterWeekDays, dateFromLocalString(selectedCalendarDate)]
+      .map(date => [formatLocalDate(date), date] as const)
+  ).values());
+
+  const classEvents = calendarCoverageDates.flatMap(d => {
+    const dateStr = formatLocalDate(d);
     const dayName = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][d.getDay()];
-    return subjects.flatMap(s => (s.scheduleBlocks || []).filter(b => b.day === dayName).map(b => ({
+    return subjects.flatMap(s => (s.scheduleBlocks || []).filter(b => b.day === dayName && isScheduleBlockActiveOnDate(b, dateStr)).map(b => ({
       id: `class_${s.id}_${dateStr}_${b.id}`,
       title: s.name,
       subtitle: `Clase · ${b.startTime}–${b.endTime}${b.room ? ` · ${b.room}` : ''}`,
@@ -2149,6 +2771,32 @@ export default function App() {
   const selectedDateEvents = calendarEvents.filter(ev => ev.date === selectedCalendarDate);
   const selectedDateStatus = getDateAcademicStatus(selectedCalendarDate);
   const selectedTaskSubjectObj = subjects.find(s => s.name === (taskSubject || subjects[0]?.name));
+
+  const moveMasterCalendar = (direction: -1 | 1) => {
+    const base = dateFromLocalString(masterCalendarCursorDate);
+    let next: Date;
+    if (calendarViewMode === 'mensual') {
+      const targetFirst = new Date(base.getFullYear(), base.getMonth() + direction, 1);
+      const maxDay = new Date(targetFirst.getFullYear(), targetFirst.getMonth() + 1, 0).getDate();
+      next = new Date(targetFirst.getFullYear(), targetFirst.getMonth(), Math.min(base.getDate(), maxDay));
+    } else {
+      next = new Date(base);
+      next.setDate(next.getDate() + direction * 7);
+    }
+    const nextStr = formatLocalDate(next);
+    setMasterCalendarCursorDate(nextStr);
+    setSelectedCalendarDate(nextStr);
+  };
+
+  const goMasterCalendarToday = () => {
+    const today = formatLocalDate(new Date());
+    setMasterCalendarCursorDate(today);
+    setSelectedCalendarDate(today);
+  };
+
+  const masterCalendarLabel = calendarViewMode === 'mensual'
+    ? masterCalendarDateObj.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })
+    : `${masterWeekDays[0].toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })} – ${masterWeekDays[6].toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 
   return (
     <>
@@ -2315,6 +2963,17 @@ export default function App() {
                 .slice(-1)[0];
               const todayClasses = calendarEvents.filter(e => e.date === todayStr && e.type === 'class').slice(0, 5);
               const todayEvents = [...todayAcademic.map(t => ({ title: t.title, subtitle: `${t.subject} · ${t.type}`, time: t.startTime || '' })), ...todayTodos.map(t => ({ title: t.title, subtitle: `${t.category} · To-Do`, time: t.dueTime || '' })), ...todayClasses.map(c => ({ title: c.title, subtitle: c.subtitle, time: '' }))].slice(0, 6);
+              const dashboardDayName = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][todayDateObj.getDay()];
+              const dashboardNowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+              const dashboardSchedule = subjects.flatMap(subject => (subject.scheduleBlocks || [])
+                .filter(block => block.day === dashboardDayName && isScheduleBlockActiveOnDate(block, todayStr))
+                .map(block => ({ subject, block })))
+                .sort((a,b) => sesTimeToMinutes(a.block.startTime) - sesTimeToMinutes(b.block.startTime));
+              const nextClassToday = dashboardSchedule.find(item => sesTimeToMinutes(item.block.endTime) >= dashboardNowMinutes);
+              const nextClassStartMinutes = nextClassToday ? sesTimeToMinutes(nextClassToday.block.startTime) : NaN;
+              const nextClassEndMinutes = nextClassToday ? sesTimeToMinutes(nextClassToday.block.endTime) : NaN;
+              const nextClassIsNow = Boolean(nextClassToday && dashboardNowMinutes >= nextClassStartMinutes && dashboardNowMinutes <= nextClassEndMinutes);
+              const nextClassMinutesAway = nextClassToday && Number.isFinite(nextClassStartMinutes) ? Math.max(0, nextClassStartMinutes - dashboardNowMinutes) : 0;
               const goalInProgress = savingGoals.filter(g => g.currentAmount < g.targetAmount).slice(0, 3);
               const dashboardHabitRate = habits.length ? Math.round((habitsDone / habits.length) * 100) : 0;
               return <>
@@ -2380,15 +3039,21 @@ export default function App() {
                   </div>
                   <div className="lifeos-dash-card">
                     <div className="lifeos-card-head"><div><span className="lifeos-overline">AGENDA DE HOY</span><h3>{todayEvents.length ? `${todayEvents.length} eventos` : 'Día despejado'}</h3></div><CalendarCheck2 size={18}/></div>
-                    {todayEvents.slice(0,4).map((item,i)=><div className="lifeos-mini-row" key={i}><span className="lifeos-time-dot"></span><div><strong>{item.title}</strong><small>{item.subtitle}{item.time?` · ${item.time}`:''}</small></div></div>)}
-                    {todayEvents.length === 0 && <div className="lifeos-empty">Sin eventos en tu agenda de hoy.</div>}
+                    {nextClassToday && <div style={{padding:'10px 11px',border:`1px solid ${theme.cardBorder}`,borderRadius:10,marginBottom:9,background:darkMode?'#111318':'#f7f7f8'}}>
+                      <div style={{fontSize:8,fontWeight:900,letterSpacing:'.08em',color:theme.textMuted}}>{nextClassIsNow ? 'CLASE AHORA' : 'PRÓXIMA CLASE'}</div>
+                      <div style={{fontSize:11,fontWeight:900,marginTop:3}}>{nextClassToday.subject.name}</div>
+                      <div style={{fontSize:9,color:theme.textMuted,marginTop:3}}>{nextClassToday.block.startTime}–{nextClassToday.block.endTime}{nextClassToday.block.room ? ` · 📍 ${nextClassToday.block.room}` : ''}</div>
+                      <div style={{fontSize:9,fontWeight:900,marginTop:4}}>{nextClassIsNow ? 'En curso' : nextClassMinutesAway < 60 ? `En ${nextClassMinutesAway} min` : `En ${Math.floor(nextClassMinutesAway/60)} h ${nextClassMinutesAway%60 ? `${nextClassMinutesAway%60} min` : ''}`}</div>
+                    </div>}
+                    {todayEvents.slice(0,nextClassToday?3:4).map((item,i)=><div className="lifeos-mini-row" key={i}><span className="lifeos-time-dot"></span><div><strong>{item.title}</strong><small>{item.subtitle}{item.time?` · ${item.time}`:''}</small></div></div>)}
+                    {todayEvents.length === 0 && !nextClassToday && <div className="lifeos-empty">Sin eventos en tu agenda de hoy.</div>}
                     <button className="lifeos-text-button" onClick={() => setActiveTab('calendario')}>Calendario Maestro →</button>
                   </div>
                 </section>
                 <section className="lifeos-dashboard-grid lifeos-dashboard-grid-middle">
                   <div className="lifeos-dash-card lifeos-span-2">
                     <div className="lifeos-card-head"><div><span className="lifeos-overline">CALENDARIO DEL MES</span><h3>{todayDateObj.toLocaleDateString('es-CL',{month:'long',year:'numeric'})}</h3></div><CalendarDays size={18}/></div>
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4,marginTop:10,fontSize:8,color:'var(--lifeos-muted)',textAlign:'center'}}>{['L','M','X','J','V','S','D'].map(d=><div key={d}>{d}</div>)}{Array.from({length:startingDayOfWeek}).map((_,i)=><div key={'e'+i}/>) }{monthCalendarDates.map(d=>{const ds=formatLocalDate(d);const has=calendarEvents.some(e=>e.date===ds);const isToday=ds===todayStr;const status=getDateAcademicStatus(ds);const dots=getCalendarEventDots(ds);const statusColor=status.type==='clases'?'#86efac':status.type==='receso_vacaciones'?'#52525b':status.type==='paro'?'#f59e0b':'#ef4444';return <button key={ds} title={status.label||''} onClick={()=>{setSelectedCalendarDate(ds);setActiveTab('calendario');}} style={{height:34,padding:'3px 2px',borderRadius:6,border:isToday?'1px solid var(--lifeos-text)':'1px solid transparent',background:has?(darkMode?'#262629':'#eeeeef'):'transparent',color:'var(--lifeos-text)',fontSize:9,cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2}}><span>{d.getDate()}</span><span style={{width:'72%',height:2,borderRadius:99,background:statusColor,opacity:.9}}></span><span style={{height:3,display:'flex',gap:2,alignItems:'center'}}>{dots.map((dot,i)=><i key={i} title={dot.label} style={{width:3,height:3,borderRadius:'50%',background:dot.color,display:'block'}} />)}</span></button>})}</div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4,marginTop:10,fontSize:8,color:'var(--lifeos-muted)',textAlign:'center'}}>{['L','M','X','J','V','S','D'].map(d=><div key={d}>{d}</div>)}{Array.from({length:startingDayOfWeek}).map((_,i)=><div key={'e'+i}/>) }{monthCalendarDates.map(d=>{const ds=formatLocalDate(d);const has=calendarEvents.some(e=>e.date===ds);const isToday=ds===todayStr;const status=getDateAcademicStatus(ds);const dots=getCalendarEventDots(ds);const statusColor=status.type==='clases'?'#86efac':status.type==='receso_vacaciones'?'#52525b':status.type==='paro'?'#f59e0b':'#ef4444';return <button key={ds} title={status.label||''} onClick={()=>{setSelectedCalendarDate(ds);setMasterCalendarCursorDate(ds);setActiveTab('calendario');}} style={{height:34,padding:'3px 2px',borderRadius:6,border:isToday?'1px solid var(--lifeos-text)':'1px solid transparent',background:has?(darkMode?'#262629':'#eeeeef'):'transparent',color:'var(--lifeos-text)',fontSize:9,cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2}}><span>{d.getDate()}</span><span style={{width:'72%',height:2,borderRadius:99,background:statusColor,opacity:.9}}></span><span style={{height:3,display:'flex',gap:2,alignItems:'center'}}>{dots.map((dot,i)=><i key={i} title={dot.label} style={{width:3,height:3,borderRadius:'50%',background:dot.color,display:'block'}} />)}</span></button>})}</div>
                     <button className="lifeos-text-button" onClick={() => setActiveTab('calendario')}>Abrir calendario →</button>
                   </div>
                   <div className="lifeos-dash-card">
@@ -2413,6 +3078,36 @@ export default function App() {
                     <button className="lifeos-text-button" onClick={() => { setActiveTab('estudios'); setStudySubTab('malla'); }}>Ver malla →</button>
                   </div>
                 </section>
+
+                {/* Reproductor personal */}
+                {musicWidgetEnabled && (
+                  <section style={{marginTop:12}}>
+                    <div className="lifeos-dash-card lifeos-music-card" style={{padding:isMobile?'12px':'14px'}}>
+                      <div className="lifeos-card-head" style={{marginBottom:10}}>
+                        <div><span className="lifeos-overline">MÚSICA</span><h3>Tu reproductor</h3></div>
+                        <Headphones size={18}/>
+                      </div>
+                      <div className="lifeos-music-layout">
+                        <div className="lifeos-vinyl-wrap" aria-hidden="true"><div className="lifeos-vinyl" /></div>
+                        {getMusicEmbed(spotifyEmbedUrl) ? (
+                          <iframe
+                            className="lifeos-music-frame"
+                            src={getMusicEmbed(spotifyEmbedUrl)!.url}
+                            title="LifeOS Music"
+                            loading="lazy"
+                            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                            allowFullScreen
+                            referrerPolicy="strict-origin-when-cross-origin"
+                            style={{height:getMusicEmbed(spotifyEmbedUrl)!.provider === 'youtube' ? (isMobile ? 180 : 220) : (['playlist','album','artist','show'].includes(getMusicEmbed(spotifyEmbedUrl)!.kind) ? (isMobile ? 210 : 232) : 152)}}
+                          />
+                        ) : (
+                          <div className="lifeos-empty">Pega un enlace normal de open.spotify.com o YouTube desde Configuración. Los enlaces cortos spotify.link no se incrustan directamente.</div>
+                        )}
+                      </div>
+                      <div style={{fontSize:9,color:'var(--lifeos-muted)',marginTop:8}}>El disco gira como animación visual. La reproducción la controla el reproductor de Spotify o YouTube.</div>
+                    </div>
+                  </section>
+                )}
 
                 {/* Racha global de hábitos: discreta y al final del dashboard */}
                 <section style={{marginTop:12}}>
@@ -2876,16 +3571,13 @@ export default function App() {
                   {academicTasks.map(t => (
                     <div key={t.id} style={{ padding: '14px', backgroundColor: theme.card, borderRadius: '12px', border: `1px solid ${theme.cardBorder}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <div style={{ fontWeight: '700', fontSize: '13px' }}>{t.title}</div>
-                        <span style={{ fontSize: '11px', color: theme.primary }}>{t.subject} ({t.type}) • Pondera {t.weight}%</span>
+                        <div style={{ fontWeight: '700', fontSize: '13px', display:'flex',alignItems:'center',gap:6,flexWrap:'wrap' }}>{t.title}{t.source==='ses_uchile' && <span style={{fontSize:8,fontWeight:900,padding:'2px 5px',borderRadius:999,border:`1px solid ${theme.cardBorder}`,color:theme.textMuted}}>SES</span>}</div>
+                        <span style={{ fontSize: '11px', color: theme.primary }}>{t.subject} ({t.type}){t.weight > 0 ? ` • Pondera ${t.weight}%` : ' • Ponderación no informada'}</span>
                         {t.notes && <div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '2px' }}>{t.notes}</div>}
                       </div>
                       <div style={{ textAlign: 'right', minWidth: 132 }}>
                         <span style={{ fontSize: '12px', fontWeight: 'bold' }}>📅 {t.dueDate}</span>
                         <div style={{display:'flex',justifyContent:'flex-end',gap:4,marginTop:5,flexWrap:'wrap'}}>
-                          <button type="button" onClick={() => exportAcademicTaskToCalendar(t)} title="Añadir al Calendario de iPhone / Apple Calendar" style={{ background: darkMode ? '#18181b' : '#f4f4f5', border: `1px solid ${theme.cardBorder}`, color: theme.text, cursor: 'pointer', padding: '5px 7px', borderRadius: 8, display:'inline-flex',alignItems:'center',gap:4,fontSize:10,fontWeight:800 }}>
-                            <CalendarCheck2 size={13} /> Calendario
-                          </button>
                           <button onClick={() => setAcademicTasks(academicTasks.filter(item => item.id !== t.id))} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}>
                             <Trash2 size={14} />
                           </button>
@@ -3180,9 +3872,6 @@ export default function App() {
                       <span style={{ fontSize: '12px', fontWeight: 'bold', color: item.dueDate ? theme.text : theme.textMuted }}>
                         📅 {item.dueDate || 'Sin fecha'}{item.dueTime ? ` · ${item.dueTime}` : ''}
                       </span>
-                      <button type="button" onClick={() => exportTodoToCalendar(item)} title="Añadir al Calendario de iPhone / Apple Calendar" style={{ background: darkMode ? '#18181b' : '#f4f4f5', border: `1px solid ${theme.cardBorder}`, color: theme.text, cursor: 'pointer', padding: '5px 7px', borderRadius: 8, display:'inline-flex',alignItems:'center',gap:4,fontSize:10,fontWeight:800 }}>
-                        <CalendarCheck2 size={13} /> Calendario
-                      </button>
                       <button onClick={() => setPersonalTodos(personalTodos.filter(td => td.id !== item.id))} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}>
                         <Trash2 size={16} />
                       </button>
@@ -3204,13 +3893,22 @@ export default function App() {
               </div>
 
               <div style={{ display: 'flex', backgroundColor: theme.card, padding: '4px', borderRadius: '10px', border: `1px solid ${theme.cardBorder}` }}>
-                <button onClick={() => setCalendarViewMode('semanal')} style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: calendarViewMode === 'semanal' ? theme.primary : 'transparent', color: calendarViewMode === 'semanal' ? '#fff' : theme.textMuted, fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
+                <button onClick={() => { setCalendarViewMode('semanal'); setMasterCalendarCursorDate(selectedCalendarDate); }} style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: calendarViewMode === 'semanal' ? theme.primary : 'transparent', color: calendarViewMode === 'semanal' ? '#fff' : theme.textMuted, fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
                   Semanal
                 </button>
-                <button onClick={() => setCalendarViewMode('mensual')} style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: calendarViewMode === 'mensual' ? theme.primary : 'transparent', color: calendarViewMode === 'mensual' ? '#fff' : theme.textMuted, fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
+                <button onClick={() => { setCalendarViewMode('mensual'); setMasterCalendarCursorDate(selectedCalendarDate); }} style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: calendarViewMode === 'mensual' ? theme.primary : 'transparent', color: calendarViewMode === 'mensual' ? '#fff' : theme.textMuted, fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
                   Mensual
                 </button>
               </div>
+            </div>
+
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, marginBottom:14, padding:'9px 10px', borderRadius:12, border:`1px solid ${theme.cardBorder}`, background:theme.card, flexWrap:'wrap' }}>
+              <button aria-label={calendarViewMode==='mensual'?'Mes anterior':'Semana anterior'} onClick={()=>moveMasterCalendar(-1)} style={{width:34,height:34,borderRadius:9,border:`1px solid ${theme.cardBorder}`,background:'transparent',color:theme.text,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><ChevronLeft size={17}/></button>
+              <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:900,textTransform:'capitalize',textAlign:'center'}}>{masterCalendarLabel}</div>
+                <button onClick={goMasterCalendarToday} style={{padding:'6px 9px',borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:'transparent',color:theme.textMuted,fontSize:10,fontWeight:900,cursor:'pointer'}}>Hoy</button>
+              </div>
+              <button aria-label={calendarViewMode==='mensual'?'Mes siguiente':'Semana siguiente'} onClick={()=>moveMasterCalendar(1)} style={{width:34,height:34,borderRadius:9,border:`1px solid ${theme.cardBorder}`,background:'transparent',color:theme.text,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><ChevronRight size={17}/></button>
             </div>
 
             <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '16px', fontSize: '12px', flexWrap: 'wrap' }}>
@@ -3231,8 +3929,8 @@ export default function App() {
             {calendarViewMode === 'semanal' && (
               <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', padding: '18px', marginBottom: '20px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
-                  {currentWeekDays.map((d, idx) => {
-                    const dateStr = d.toISOString().split('T')[0];
+                  {masterWeekDays.map((d, idx) => {
+                    const dateStr = formatLocalDate(d);
                     const isToday = dateStr === todayStr;
                     const isSelected = dateStr === selectedCalendarDate;
                     const dayEvents = calendarEvents.filter(ev => ev.date === dateStr);
@@ -3283,7 +3981,7 @@ export default function App() {
             {calendarViewMode === 'mensual' && (
               <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', padding: '18px', marginBottom: '20px' }}>
                 <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', textAlign: 'center', textTransform: 'capitalize' }}>
-                  {todayDateObj.toLocaleString('es-CL', { month: 'long', year: 'numeric' })}
+                  {masterCalendarDateObj.toLocaleString('es-CL', { month: 'long', year: 'numeric' })}
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center', fontSize: '11px', color: theme.textMuted, fontWeight: 'bold', marginBottom: '8px' }}>
@@ -3291,13 +3989,13 @@ export default function App() {
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
-                  {Array.from({ length: startingDayOfWeek }).map((_, i) => (
+                  {Array.from({ length: masterStartingDayOfWeek }).map((_, i) => (
                     <div key={`empty_${i}`} style={{ minHeight: '48px' }} />
                   ))}
 
-                  {Array.from({ length: daysInCurrentMonth }, (_, i) => {
+                  {Array.from({ length: masterDaysInMonth }, (_, i) => {
                     const dayNum = i + 1;
-                    const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                    const dateStr = `${masterYear}-${String(masterMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
                     const isToday = dateStr === todayStr;
                     const isSelected = dateStr === selectedCalendarDate;
                     const dayEvents = calendarEvents.filter(ev => ev.date === dateStr);
@@ -3468,8 +4166,189 @@ export default function App() {
             </div>
 
             <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '16px', padding: '18px' }}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,flexWrap:'wrap'}}>
+                <div>
+                  <h2 style={{fontSize:15,fontWeight:900,margin:0}}>✉️ Centro de avisos por correo</h2>
+                  <p style={{fontSize:11,color:theme.textMuted,margin:'4px 0 0',lineHeight:1.45}}>Funciona aunque LifeOS esté cerrado. El servidor de Supabase revisa tu horario y evaluaciones y envía los avisos configurados.</p>
+                </div>
+                <button onClick={()=>setEmailCenterEnabled(!emailCenterEnabled)} style={{padding:'8px 11px',borderRadius:9,border:`1px solid ${theme.cardBorder}`,background:emailCenterEnabled?theme.text:'transparent',color:emailCenterEnabled?(darkMode?'#090909':'#fff'):theme.text,fontWeight:900,fontSize:11}}>{emailCenterEnabled?'ACTIVO':'INACTIVO'}</button>
+              </div>
+
+              <div style={{marginTop:13}}>
+                <label style={{fontSize:10,fontWeight:900,color:theme.textMuted}}>CORREO DE DESTINO</label>
+                <input type='email' placeholder='tu@correo.com' value={emailAddress} onChange={e=>setEmailAddress(e.target.value)} style={{width:'100%',boxSizing:'border-box',padding:10,borderRadius:9,background:theme.card,border:`1px solid ${theme.cardBorder}`,color:theme.text,marginTop:5}}/>
+              </div>
+
+              <div style={{display:'flex',flexDirection:'column',gap:9,marginTop:13}}>
+                <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr auto',gap:10,alignItems:'center',padding:'10px 0',borderTop:`1px solid ${theme.cardBorder}`}}>
+                  <div><div style={{fontSize:11,fontWeight:900}}>Resumen diario</div><div style={{fontSize:9,color:theme.textMuted,marginTop:2}}>Clases y salas de hoy, evaluaciones próximas y pendientes del día.</div></div>
+                  <div style={{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap'}}>
+                    <input type='time' value={emailDailyTime} onChange={e=>setEmailDailyTime(e.target.value)} style={{padding:'7px 8px',borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:theme.card,color:theme.text,fontSize:10}}/>
+                    <button onClick={()=>setEmailDailyEnabled(!emailDailyEnabled)} style={{padding:'7px 9px',borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:emailDailyEnabled?theme.text:'transparent',color:emailDailyEnabled?(darkMode?'#090909':'#fff'):theme.text,fontWeight:900,fontSize:10}}>{emailDailyEnabled?'ON':'OFF'}</button>
+                  </div>
+                </div>
+
+                <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr auto',gap:10,alignItems:'center',padding:'10px 0',borderTop:`1px solid ${theme.cardBorder}`}}>
+                  <div><div style={{fontSize:11,fontWeight:900}}>Próxima clase</div><div style={{fontSize:9,color:theme.textMuted,marginTop:2}}>Correo con ramo, hora y sala usando el horario oficial SES.</div></div>
+                  <div style={{display:'flex',alignItems:'center',gap:7}}>
+                    <input type='number' min={5} max={180} value={emailClassMinutes} onChange={e=>setEmailClassMinutes(Math.max(1,Number(e.target.value)||20))} style={{width:68,padding:'7px 8px',borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:theme.card,color:theme.text,fontSize:10}}/>
+                    <span style={{fontSize:9,color:theme.textMuted}}>min</span>
+                    <button onClick={()=>setEmailClassEnabled(!emailClassEnabled)} style={{padding:'7px 9px',borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:emailClassEnabled?theme.text:'transparent',color:emailClassEnabled?(darkMode?'#090909':'#fff'):theme.text,fontWeight:900,fontSize:10}}>{emailClassEnabled?'ON':'OFF'}</button>
+                  </div>
+                </div>
+
+                <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr auto',gap:10,alignItems:'center',padding:'10px 0',borderTop:`1px solid ${theme.cardBorder}`}}>
+                  <div><div style={{fontSize:11,fontWeight:900}}>Evaluaciones</div><div style={{fontSize:9,color:theme.textMuted,marginTop:2}}>Avisos antes de certámenes, controles, laboratorios y exámenes.</div></div>
+                  <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                    {[24,2].map(hours=>{const active=emailEvaluationOffsets.includes(hours);return <button key={hours} onClick={()=>setEmailEvaluationOffsets(active?emailEvaluationOffsets.filter(v=>v!==hours):[...emailEvaluationOffsets,hours].sort((a,b)=>b-a))} style={{padding:'7px 8px',borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:active?theme.text:'transparent',color:active?(darkMode?'#090909':'#fff'):theme.text,fontWeight:900,fontSize:9}}>{hours} h</button>})}
+                    <button onClick={()=>setEmailEvaluationEnabled(!emailEvaluationEnabled)} style={{padding:'7px 9px',borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:emailEvaluationEnabled?theme.text:'transparent',color:emailEvaluationEnabled?(darkMode?'#090909':'#fff'):theme.text,fontWeight:900,fontSize:10}}>{emailEvaluationEnabled?'ON':'OFF'}</button>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:12}}>
+                <button disabled={emailTestStatus==='sending'} onClick={()=>void sendLifeOSEmailTest()} style={{padding:'9px 12px',border:0,borderRadius:9,background:theme.text,color:darkMode?'#090909':'#fff',fontWeight:900,fontSize:11}}>{emailTestStatus==='sending'?'Enviando…':'Enviar correo de prueba'}</button>
+                <span style={{fontSize:9,color:emailTestStatus==='error'?'#ef4444':emailTestStatus==='ok'?'#22c55e':theme.textMuted}}>Requiere desplegar la función <strong>lifeos-email</strong> una sola vez en Supabase.</span>
+              </div>
+              {emailTestMessage && <div style={{marginTop:9,padding:9,borderRadius:8,border:`1px solid ${emailTestStatus==='error'?'#ef444455':'#22c55e55'}`,background:emailTestStatus==='error'?'#ef444411':'#22c55e10',fontSize:9,color:emailTestStatus==='error'?'#ef4444':theme.textMuted}}>{emailTestMessage}</div>}
+              <div style={{fontSize:9,color:theme.textMuted,marginTop:10,lineHeight:1.5}}>Los avisos automáticos se basan en los datos sincronizados de LifeOS Cloud. Después de cambiar estos ajustes, deja LifeOS abierto unos segundos para que la nube suba la configuración.</div>
+            </div>
+
+            <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '16px', padding: '18px' }}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12}}><div><h2 style={{fontSize:15,fontWeight:900,margin:0}}>Sonidos de la interfaz</h2><p style={{fontSize:11,color:theme.textMuted,margin:'4px 0 0'}}>Pequeños sonidos tipo interfaz móvil al pulsar botones.</p></div><button onClick={()=>setSoundsEnabled(!soundsEnabled)} style={{padding:'8px 11px',borderRadius:9,border:`1px solid ${theme.cardBorder}`,background:soundsEnabled?theme.text:'transparent',color:soundsEnabled?(darkMode?'#090909':'#fff'):theme.text,fontWeight:900,fontSize:11}}>{soundsEnabled?'Activados':'Desactivados'}</button></div>
               <div style={{marginTop:12}}><div style={{fontSize:10,fontWeight:900,color:theme.textMuted,marginBottom:5}}>FONDO DEL DASHBOARD · OPCIONAL</div><div style={{display:'flex',gap:7,flexWrap:'wrap'}}><label style={{padding:'8px 10px',border:`1px solid ${theme.cardBorder}`,borderRadius:9,cursor:'pointer',fontSize:10,fontWeight:800,display:'inline-flex',alignItems:'center',gap:5}}><Image size={13}/> Elegir foto<input type='file' accept='image/*' style={{display:'none'}} onChange={async e=>{const file=e.target.files?.[0];if(!file)return;if(file.size>10*1024*1024){alert('Elige una imagen de máximo 10 MB. LifeOS la comprimirá automáticamente para guardarla.');return;}try{const data=await compressDashboardImage(file);setDashboardBackground(data);}catch(err){alert('No se pudo procesar la imagen. Prueba con JPG, PNG o WEBP.');}}}/></label>{dashboardBackground&&<button onClick={()=>setDashboardBackground('')} style={{padding:'8px 10px',border:`1px solid ${theme.cardBorder}`,borderRadius:9,background:'transparent',color:theme.text,fontSize:10,fontWeight:800}}>Quitar foto</button>}</div></div>
+            </div>
+
+            <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '16px', padding: '18px' }}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,flexWrap:'wrap'}}>
+                <div>
+                  <h2 style={{fontSize:15,fontWeight:900,margin:0}}>🎓 Sincronización SES UChile</h2>
+                  <p style={{fontSize:11,color:theme.textMuted,margin:'4px 0 0',lineHeight:1.45}}>Prueba el calendario público oficial antes de 2027. LifeOS sólo muestra coincidencias con tus ramos activos y no importa nada hasta que tú lo autorices.</p>
+                </div>
+                <div style={{fontSize:10,fontWeight:900,padding:'5px 8px',borderRadius:999,border:`1px solid ${theme.cardBorder}`,color:sesStatus==='ok'?'#22c55e':sesStatus==='error'?'#ef4444':theme.textMuted}}>
+                  {sesStatus==='loading' ? 'CONSULTANDO…' : sesStatus==='ok' ? '● CONECTADO' : sesStatus==='error' ? 'ERROR' : 'MODO PRUEBA'}
+                </div>
+              </div>
+
+              <div style={{marginTop:12,display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:9}}>
+                <div style={{padding:11,borderRadius:10,border:`1px solid ${theme.cardBorder}`,background:darkMode?'#0e1017':'#f8f8f9'}}>
+                  <div style={{fontSize:10,fontWeight:900,color:theme.textMuted,marginBottom:6}}>PERÍODO A CONSULTAR</div>
+                  <input
+                    value={sesUseAutomaticPeriod ? sesPeriodForSemester(currentSemesterNumber) : sesTestPeriod}
+                    disabled={sesUseAutomaticPeriod}
+                    onChange={e=>setSesTestPeriod(e.target.value)}
+                    placeholder="2026-2"
+                    style={{width:'100%',boxSizing:'border-box',padding:9,borderRadius:8,background:theme.card,border:`1px solid ${theme.cardBorder}`,color:theme.text,fontWeight:800}}
+                  />
+                  <div style={{fontSize:9,color:theme.textMuted,marginTop:6}}>Para probar ahora usa <strong style={{color:theme.text}}>2026-2</strong>. Tu semestre 1 real corresponde automáticamente a <strong style={{color:theme.text}}>2027-1</strong>.</div>
+                </div>
+                <div style={{padding:11,borderRadius:10,border:`1px solid ${theme.cardBorder}`,background:darkMode?'#0e1017':'#f8f8f9'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'center'}}>
+                    <div><div style={{fontSize:10,fontWeight:900}}>Período automático</div><div style={{fontSize:9,color:theme.textMuted,marginTop:3}}>Usa tu semestre actual de LifeOS.</div></div>
+                    <button onClick={()=>{setSesUseAutomaticPeriod(!sesUseAutomaticPeriod);setSesEvaluations([]);setSesStatus('idle');setSesMessage('');}} style={{padding:'7px 10px',borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:sesUseAutomaticPeriod?theme.text:'transparent',color:sesUseAutomaticPeriod?(darkMode?'#090909':'#fff'):theme.text,fontWeight:900,fontSize:10}}>{sesUseAutomaticPeriod?'ACTIVO':'PRUEBA'}</button>
+                  </div>
+                  <div style={{fontSize:9,color:theme.textMuted,marginTop:8}}>Semestre {currentSemesterNumber} → <strong style={{color:theme.text}}>{sesPeriodForSemester(currentSemesterNumber)}</strong>. Déjalo en PRUEBA hasta que quieras usar datos 2027.</div>
+                </div>
+              </div>
+
+              <div style={{display:'flex',gap:7,flexWrap:'wrap',marginTop:10}}>
+                <button disabled={sesStatus==='loading'} onClick={()=>void fetchSesEvaluations()} style={{padding:'9px 12px',border:0,borderRadius:9,background:theme.text,color:darkMode?'#090909':'#fff',fontWeight:900,fontSize:11}}>{sesStatus==='loading'?'Consultando…':'Probar conexión SES'}</button>
+                {sesStatus==='ok' && sesMatchedEvaluations.length>0 && <button onClick={importSesMatchedEvaluations} style={{padding:'9px 12px',border:`1px solid ${theme.cardBorder}`,borderRadius:9,background:'transparent',color:theme.text,fontWeight:900,fontSize:11}}>Importar / actualizar {sesMatchedEvaluations.length}</button>}
+                <button onClick={removeSesPeriodImports} style={{padding:'9px 12px',border:`1px solid ${theme.cardBorder}`,borderRadius:9,background:'transparent',color:'#ef4444',fontWeight:900,fontSize:11}}>Borrar importadas de {activeSesPeriod || 'este período'}</button>
+              </div>
+
+              {sesMessage && <div style={{marginTop:10,padding:10,borderRadius:9,border:`1px solid ${sesStatus==='error'?'#ef444455':theme.cardBorder}`,background:sesStatus==='error'?'#ef444411':(darkMode?'#0e1017':'#f8f8f9'),fontSize:10,color:sesStatus==='error'?'#ef4444':theme.textMuted,lineHeight:1.5}}>{sesMessage}{sesLastChecked && sesStatus==='ok' ? ` · Última revisión: ${sesLastChecked}` : ''}</div>}
+
+              {sesStatus==='ok' && (
+                <div style={{marginTop:10}}>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:7}}>
+                    <div style={{padding:9,borderRadius:9,border:`1px solid ${theme.cardBorder}`,textAlign:'center'}}><strong style={{display:'block',fontSize:17}}>{sesEvaluations.length}</strong><span style={{fontSize:9,color:theme.textMuted}}>TOTAL SES</span></div>
+                    <div style={{padding:9,borderRadius:9,border:`1px solid ${theme.cardBorder}`,textAlign:'center'}}><strong style={{display:'block',fontSize:17}}>{sesQfEvaluations.length}</strong><span style={{fontSize:9,color:theme.textMuted}}>Q&F</span></div>
+                    <div style={{padding:9,borderRadius:9,border:`1px solid ${theme.cardBorder}`,textAlign:'center'}}><strong style={{display:'block',fontSize:17}}>{sesMatchedEvaluations.length}</strong><span style={{fontSize:9,color:theme.textMuted}}>TUS RAMOS</span></div>
+                  </div>
+                  <div style={{marginTop:9,maxHeight:260,overflowY:'auto',borderTop:`1px solid ${theme.cardBorder}`}}>
+                    {sesMatchedEvaluations.length===0 ? <div style={{fontSize:10,color:theme.textMuted,padding:'12px 0'}}>La conexión funciona, pero ninguna evaluación publicada coincide con los nombres de tus ramos activos. Esto puede ser normal en el período de prueba.</div> : sesMatchedEvaluations.map(({ev,subject})=><div key={`ses-${ev.id}`} style={{display:'flex',justifyContent:'space-between',gap:12,padding:'9px 0',borderBottom:`1px solid ${theme.cardBorder}`}}><div style={{minWidth:0}}><div style={{fontSize:10,fontWeight:900,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{subject.name}</div><div style={{fontSize:9,color:theme.textMuted,marginTop:2}}>{sesTaskTitle(ev)} · SES #{ev.id}</div></div><div style={{fontSize:9,fontWeight:800,whiteSpace:'nowrap'}}>{String(ev.dia || '').slice(0,10) || 'Sin fecha'}</div></div>)}
+                  </div>
+                  <div style={{fontSize:9,color:theme.textMuted,marginTop:8,lineHeight:1.45}}>Importar crea/actualiza fechas en <strong style={{color:theme.text}}>Estudios → Calendario</strong> y Calendario Maestro. Si SES no informa la ponderación, LifeOS enlaza la evaluación con <strong style={{color:theme.text}}>Ramos & Notas</strong> (por tipo y número) y usa automáticamente la ponderación que configuraste allí.</div>
+                </div>
+              )}
+
+              <div style={{marginTop:18,paddingTop:16,borderTop:`1px solid ${theme.cardBorder}`}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,flexWrap:'wrap'}}>
+                  <div>
+                    <h3 style={{fontSize:13,fontWeight:900,margin:0}}>🗓️ Horario oficial Q&F</h3>
+                    <p style={{fontSize:10,color:theme.textMuted,margin:'4px 0 0',lineHeight:1.45}}>Lee el horario público oficial, cruza únicamente tus ramos activos y agrupa automáticamente los módulos consecutivos. El período usado es <strong style={{color:theme.text}}>{activeSesPeriod || '—'}</strong>.</p>
+                  </div>
+                  <div style={{fontSize:9,fontWeight:900,padding:'5px 8px',borderRadius:999,border:`1px solid ${theme.cardBorder}`,color:sesScheduleStatus==='ok'?'#22c55e':sesScheduleStatus==='error'?'#ef4444':theme.textMuted}}>
+                    {sesScheduleStatus==='loading'?'CONSULTANDO…':sesScheduleStatus==='ok'?'● HORARIO CONECTADO':sesScheduleStatus==='error'?'ERROR':'SIN PROBAR'}
+                  </div>
+                </div>
+
+                <div style={{display:'flex',gap:7,flexWrap:'wrap',marginTop:10}}>
+                  <button disabled={sesScheduleStatus==='loading'} onClick={()=>void fetchSesSchedule()} style={{padding:'9px 12px',border:0,borderRadius:9,background:theme.text,color:darkMode?'#090909':'#fff',fontWeight:900,fontSize:11}}>{sesScheduleStatus==='loading'?'Consultando…':'Probar horario SES'}</button>
+                  {sesScheduleStatus==='ok' && sesScheduleGroups.length>0 && <button onClick={importSesSchedule} style={{padding:'9px 12px',border:`1px solid ${theme.cardBorder}`,borderRadius:9,background:'transparent',color:theme.text,fontWeight:900,fontSize:11}}>Importar / actualizar horario</button>}
+                  {Object.keys(sesScheduleBackup).length>0 && <button onClick={restoreManualSesSchedule} style={{padding:'9px 12px',border:`1px solid ${theme.cardBorder}`,borderRadius:9,background:'transparent',color:'#f59e0b',fontWeight:900,fontSize:11}}>Restaurar horario manual</button>}
+                  <button onClick={()=>setSesClassNotificationsEnabled(!sesClassNotificationsEnabled)} style={{padding:'9px 12px',border:`1px solid ${theme.cardBorder}`,borderRadius:9,background:sesClassNotificationsEnabled?theme.text:'transparent',color:sesClassNotificationsEnabled?(darkMode?'#090909':'#fff'):theme.text,fontWeight:900,fontSize:11}}>Aviso 20 min: {sesClassNotificationsEnabled?'ON':'OFF'}</button>
+                </div>
+
+                {!notificationsEnabled && sesClassNotificationsEnabled && <div style={{fontSize:9,color:'#f59e0b',marginTop:8,lineHeight:1.45}}>El aviso de 20 minutos está preparado, pero primero debes activar <strong>Notificaciones</strong> en Configuración. Por ahora funciona cuando LifeOS/PWA está activo; el push con la app completamente cerrada requiere la siguiente capa de Web Push.</div>}
+
+                {sesScheduleMessage && <div style={{marginTop:10,padding:10,borderRadius:9,border:`1px solid ${sesScheduleStatus==='error'?'#ef444455':theme.cardBorder}`,background:sesScheduleStatus==='error'?'#ef444411':(darkMode?'#0e1017':'#f8f8f9'),fontSize:10,color:sesScheduleStatus==='error'?'#ef4444':theme.textMuted,lineHeight:1.5}}>{sesScheduleMessage}{sesScheduleLastChecked && sesScheduleStatus==='ok'?` · Última revisión: ${sesScheduleLastChecked}`:''}</div>}
+
+                {sesScheduleStatus==='ok' && <div style={{marginTop:10}}>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:7}}>
+                    <div style={{padding:9,borderRadius:9,border:`1px solid ${theme.cardBorder}`,textAlign:'center'}}><strong style={{display:'block',fontSize:17}}>{sesSchedulePeriodRows.length}</strong><span style={{fontSize:9,color:theme.textMuted}}>MÓDULOS {activeSesPeriod}</span></div>
+                    <div style={{padding:9,borderRadius:9,border:`1px solid ${theme.cardBorder}`,textAlign:'center'}}><strong style={{display:'block',fontSize:17}}>{sesScheduleSubjectSummaries.length}</strong><span style={{fontSize:9,color:theme.textMuted}}>TUS RAMOS</span></div>
+                    <div style={{padding:9,borderRadius:9,border:`1px solid ${theme.cardBorder}`,textAlign:'center'}}><strong style={{display:'block',fontSize:17}}>{sesScheduleGroups.length}</strong><span style={{fontSize:9,color:theme.textMuted}}>BLOQUES AGRUPADOS</span></div>
+                  </div>
+
+                  {sesScheduleUnresolvedSections>0 && <div style={{marginTop:9,padding:9,borderRadius:9,border:'1px solid #f59e0b55',background:'#f59e0b10',fontSize:9,color:theme.textMuted}}>Hay {sesScheduleUnresolvedSections} ramo(s) con más de una sección. Elige la tuya para que LifeOS no adivine.</div>}
+
+                  {sesScheduleSubjectSummaries.filter(summary=>summary.sections.length>1).map(summary=><div key={`section-${summary.subject.id}`} style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 150px',gap:8,alignItems:'center',padding:'9px 0',borderBottom:`1px solid ${theme.cardBorder}`}}>
+                    <div><div style={{fontSize:10,fontWeight:900}}>{summary.subject.name}</div><div style={{fontSize:8,color:theme.textMuted,marginTop:2}}>SES detectó {summary.sections.length} secciones</div></div>
+                    <select value={summary.selectedSection ?? ''} onChange={e=>setSesScheduleSectionChoices({...sesScheduleSectionChoices,[String(summary.subject.id)]:Number(e.target.value)})} style={{width:'100%',padding:8,borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:theme.card,color:theme.text,fontSize:10}}>
+                      <option value=''>Elegir sección…</option>
+                      {summary.sections.map(section=><option key={section} value={section}>Sección {section}</option>)}
+                    </select>
+                  </div>)}
+
+                  <div style={{marginTop:9,maxHeight:340,overflowY:'auto',borderTop:`1px solid ${theme.cardBorder}`}}>
+                    {sesScheduleGroups.length===0 ? <div style={{fontSize:10,color:theme.textMuted,padding:'12px 0'}}>No hay bloques que coincidan con tus ramos activos para este período, o falta elegir una sección.</div> : sesScheduleGroups.map(group=><div key={`schedule-${group.externalBlockKey}-${group.subject.id}`} style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr auto',gap:10,alignItems:'center',padding:'9px 0',borderBottom:`1px solid ${theme.cardBorder}`}}>
+                      <div style={{minWidth:0}}>
+                        <div style={{fontSize:10,fontWeight:900,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{group.subject.name}</div>
+                        <div style={{fontSize:9,color:theme.textMuted,marginTop:2}}>{group.day} · {group.startTime}–{group.endTime} · Sección {group.section}</div>
+                      </div>
+                      {group.rooms.length>1 ? <select value={group.selectedRoom} onChange={e=>setSesScheduleRoomChoices({...sesScheduleRoomChoices,[group.roomChoiceKey]:e.target.value})} style={{maxWidth:isMobile?'100%':190,padding:7,borderRadius:8,border:`1px solid ${group.selectedRoom?theme.cardBorder:'#f59e0b88'}`,background:theme.card,color:theme.text,fontSize:9}}>
+                        <option value=''>Elegir sala…</option>
+                        {group.rooms.map(room=><option key={room} value={room}>{room}</option>)}
+                      </select> : <div style={{fontSize:9,fontWeight:900,whiteSpace:'nowrap'}}>📍 {group.rooms[0] || 'Por confirmar'}</div>}
+                    </div>)}
+                  </div>
+
+                  <div style={{fontSize:9,color:theme.textMuted,marginTop:8,lineHeight:1.5}}>LifeOS respalda tu horario manual antes de reemplazarlo. Los módulos seguidos del mismo ramo y sala se convierten en un solo bloque. Si SES publica varias salas simultáneas, tú eliges la correcta y LifeOS la recuerda. El horario importado alimenta automáticamente <strong style={{color:theme.text}}>Agenda, Calendario Maestro y Próxima clase</strong>.</div>
+                </div>}
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '16px', padding: '18px' }}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12}}>
+                <div>
+                  <h2 style={{fontSize:15,fontWeight:900,margin:0}}>🎵 Widget de música</h2>
+                  <p style={{fontSize:11,color:theme.textMuted,margin:'4px 0 0',lineHeight:1.45}}>Pega una canción, álbum o playlist de Spotify, o un video/playlist de YouTube. LifeOS convierte el enlace a su reproductor embebido para que no cargue la página externa dentro del widget.</p>
+                </div>
+                <button onClick={()=>setMusicWidgetEnabled(!musicWidgetEnabled)} style={{padding:'8px 11px',borderRadius:9,border:`1px solid ${theme.cardBorder}`,background:musicWidgetEnabled?theme.text:'transparent',color:musicWidgetEnabled?(darkMode?'#090909':'#fff'):theme.text,fontWeight:900,fontSize:11}}>{musicWidgetEnabled?'Visible':'Oculto'}</button>
+              </div>
+              <div style={{marginTop:12}}>
+                <label style={{fontSize:10,fontWeight:900,color:theme.textMuted}}>ENLACE DEL REPRODUCTOR</label>
+                <input
+                  type="url"
+                  value={spotifyEmbedUrl}
+                  onChange={e=>setSpotifyEmbedUrl(e.target.value)}
+                  placeholder="https://open.spotify.com/playlist/..."
+                  style={{width:'100%',boxSizing:'border-box',padding:10,borderRadius:9,background:theme.card,border:`1px solid ${theme.cardBorder}`,color:theme.text,marginTop:5}}
+                />
+                <div style={{fontSize:9,color:theme.textMuted,marginTop:6,lineHeight:1.45}}>{getMusicEmbed(spotifyEmbedUrl) ? `✓ Enlace reconocido: ${getMusicEmbed(spotifyEmbedUrl)!.provider === 'spotify' ? 'Spotify' : 'YouTube'} · ${getMusicEmbed(spotifyEmbedUrl)!.kind}. Pulsa reproducir dentro del widget; el navegador bloquea el autoplay.` : 'Pega un enlace de open.spotify.com, youtube.com, music.youtube.com o youtu.be. Si Spotify te da spotify.link, abre ese enlace y copia después la URL open.spotify.com.'}</div>
+              </div>
             </div>
 
             <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '16px', padding: '18px' }}>
