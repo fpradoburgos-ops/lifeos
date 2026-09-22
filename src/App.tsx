@@ -389,6 +389,7 @@ interface Habit {
   completed: boolean;
   frequency?: 'daily' | 'weekly';
   weeklyTarget?: number;
+  dailyTarget?: number;
   isBad?: boolean;
   hasEndDate?: boolean;
   endDate?: string;
@@ -421,6 +422,7 @@ interface AcademicTask {
   externalId?: number;
   externalPeriod?: string;
   externalUpdatedAt?: string;
+  externalRoom?: string;
 }
 
 interface SesEvaluation {
@@ -506,9 +508,10 @@ interface CurriculumSubject {
   name: string;
   code: string;
   semester: number;
-  status: 'pendiente' | 'cursando' | 'aprobado' | 'reprobado';
+  status: 'pendiente' | 'cursando' | 'aprobado' | 'reprobado' | 'convalidado';
   credits: number;
   finalGrade?: number | null;
+  statusSource?: 'manual' | 'grades';
   prerequisites?: string[];
   line?: string;
 }
@@ -571,19 +574,19 @@ function MoneyLineChart({ data, theme, title }: { data: MoneyPoint[]; theme: any
   const y = (v: number) => pad.top + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
   const gridValues = [0, .25, .5, .75, 1].map(t => yMin + (yMax - yMin) * t);
 
-  return <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', padding: '20px', overflow: 'hidden' }}>
+  return <div className='lifeos-animated-panel' style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', padding: '20px', overflow: 'hidden' }}>
     <div style={{ fontSize: '15px', fontWeight: '800', marginBottom: '4px' }}>{title}</div>
     <div style={{ fontSize: '11px', color: theme.textMuted, marginBottom: '8px' }}>Pasa el mouse por los puntos para ver el dato exacto. También puedes hacer clic.</div>
     {data.length === 0 ? <div style={{ height: height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.textMuted, fontSize: '12px' }}>Aún no hay movimientos registrados.</div> :
       <div style={{ position: 'relative', width: '100%', overflowX: 'auto' }}>
-        <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height}>
+        <svg className='lifeos-chart-epic' viewBox={`0 0 ${width} ${height}`} width="100%" height={height}>
           {gridValues.map((gv, i) => <g key={i}>
             <line x1={pad.left} x2={width-pad.right} y1={y(gv)} y2={y(gv)} stroke={theme.cardBorder} strokeDasharray="4 5" />
             <text x={pad.left-10} y={y(gv)+4} textAnchor="end" fontSize="10" fill={theme.textMuted}>{formatCLPValue(gv)}</text>
           </g>)}
           <line x1={pad.left} x2={pad.left} y1={pad.top} y2={height-pad.bottom} stroke={theme.cardBorder} />
           <line x1={pad.left} x2={width-pad.right} y1={height-pad.bottom} y2={height-pad.bottom} stroke={theme.cardBorder} />
-          <polyline points={data.map((p,i)=>`${x(i)},${y(p.value)}`).join(' ')} fill="none" stroke={theme.primary} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          <polyline className='lifeos-chart-line' pathLength='1' points={data.map((p,i)=>`${x(i)},${y(p.value)}`).join(' ')} fill="none" stroke={theme.primary} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           {data.map((p,i)=><g key={i} onMouseEnter={()=>setActiveIndex(i)} onMouseLeave={()=>setActiveIndex(null)} onClick={()=>setActiveIndex(i)} style={{cursor:'pointer'}}>
             <circle cx={x(i)} cy={y(p.value)} r={activeIndex===i?6:4} fill={theme.primary} stroke={theme.card} strokeWidth="2" />
             <text x={x(i)} y={height-16} textAnchor="middle" fontSize="9" fill={theme.textMuted}>{p.label}</text>
@@ -636,8 +639,11 @@ const LIFEOS_V9_CSS = `
   html, body, #root { min-height: 100%; }
   body { margin: 0; background: #090909; }
   button, input, select, textarea { font: inherit; }
-  button { transition: background .16s ease, border-color .16s ease, opacity .16s ease; }
-  button:hover { opacity: .92; }
+  button { transition: background .16s ease, border-color .16s ease, opacity .16s ease, transform .16s cubic-bezier(.2,.75,.2,1), box-shadow .16s ease; }
+  button:hover { opacity: .94; transform:translateY(-1px); }
+  button:active { transform:translateY(0) scale(.975); }
+  input, select, textarea { transition:border-color .16s ease, box-shadow .16s ease, background .16s ease; }
+  input:focus, select:focus, textarea:focus { outline:none; box-shadow:0 0 0 3px rgba(148,163,184,.10); }
   input, select, textarea { min-width: 0; }
   .lifeos-app-shell { width: 100%; }
   @media (max-width: 639px) {
@@ -712,6 +718,55 @@ const LIFEOS_V9_CSS = `
   .lifeos-vinyl::before { content:'⚡'; position:absolute; inset:50% auto auto 50%; transform:translate(-50%,-50%); width:28px; height:28px; border-radius:50%; background:#f5f5f5; color:#09090b; display:flex; align-items:center; justify-content:center; font-size:14px; line-height:28px; text-align:center; box-shadow:0 0 0 4px #111113; }
   .lifeos-music-frame { width:100%; height:82px; border:0; border-radius:10px; display:block; background:#0d0d0f; }
   @keyframes lifeos-vinyl-spin { to { transform:rotate(360deg); } }
+  @keyframes lifeos-rise-in {
+    0% { opacity:0; transform:translateY(14px) scale(.985); filter:blur(5px); }
+    60% { opacity:1; filter:blur(0); }
+    100% { opacity:1; transform:translateY(0) scale(1); }
+  }
+  @keyframes lifeos-chart-draw {
+    from { stroke-dashoffset:1; opacity:.15; }
+    to { stroke-dashoffset:0; opacity:1; }
+  }
+  @keyframes lifeos-soft-glow {
+    0%,100% { filter:drop-shadow(0 0 0 rgba(255,255,255,0)); }
+    50% { filter:drop-shadow(0 0 6px rgba(255,255,255,.22)); }
+  }
+  .lifeos-dash-card, .lifeos-dashboard-footer-card, .lifeos-card, .lifeos-animated-panel {
+    animation:lifeos-rise-in .46s cubic-bezier(.2,.75,.2,1) both;
+  }
+  .lifeos-dashboard-grid > *:nth-child(2) { animation-delay:.05s; }
+  .lifeos-dashboard-grid > *:nth-child(3) { animation-delay:.10s; }
+  .lifeos-chart-epic { overflow:visible; animation:lifeos-rise-in .55s ease both; }
+  .lifeos-chart-line { stroke-dasharray:1; stroke-dashoffset:1; animation:lifeos-chart-draw 1.15s cubic-bezier(.2,.8,.2,1) .08s forwards, lifeos-soft-glow 2.8s ease-in-out 1.3s infinite; }
+  .lifeos-chart-baseline { opacity:.55; animation:lifeos-rise-in .6s ease both; }
+
+  @keyframes lifeos-panel-pop {
+    0% { opacity:0; transform:translateY(8px) scale(.992); }
+    100% { opacity:1; transform:translateY(0) scale(1); }
+  }
+  @keyframes lifeos-modal-in {
+    0% { opacity:0; backdrop-filter:blur(0px); }
+    100% { opacity:1; backdrop-filter:blur(6px); }
+  }
+  @keyframes lifeos-modal-card-in {
+    0% { opacity:0; transform:translateY(16px) scale(.975); }
+    100% { opacity:1; transform:translateY(0) scale(1); }
+  }
+  .lifeos-page-transition { animation:lifeos-panel-pop .24s cubic-bezier(.2,.75,.2,1) both; }
+  .lifeos-dash-card, .lifeos-dashboard-footer-card { transition:transform .20s cubic-bezier(.2,.75,.2,1), border-color .20s ease, box-shadow .20s ease; }
+  .lifeos-dash-card:hover, .lifeos-dashboard-footer-card:hover { transform:translateY(-2px); box-shadow:0 12px 28px rgba(0,0,0,.10); }
+  .lifeos-mini-row, .lifeos-habit-row, .lifeos-upcoming-row, .lifeos-goal-row { transition:transform .16s ease, opacity .16s ease, background .16s ease; }
+  .lifeos-mini-row:hover, .lifeos-upcoming-row:hover, .lifeos-goal-row:hover { transform:translateX(2px); }
+  .lifeos-modal-overlay { animation:lifeos-modal-in .18s ease both; }
+  .lifeos-modal-card { animation:lifeos-modal-card-in .24s cubic-bezier(.2,.8,.2,1) both; }
+  ::view-transition-old(root) { animation:lifeos-vt-old .16s ease both; }
+  ::view-transition-new(root) { animation:lifeos-vt-new .22s cubic-bezier(.2,.75,.2,1) both; }
+  @keyframes lifeos-vt-old { to { opacity:0; transform:scale(.995); filter:blur(1px); } }
+  @keyframes lifeos-vt-new { from { opacity:0; transform:translateY(6px) scale(.995); filter:blur(2px); } to { opacity:1; transform:none; filter:none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .lifeos-dash-card, .lifeos-dashboard-footer-card, .lifeos-card, .lifeos-animated-panel, .lifeos-chart-epic, .lifeos-chart-line, .lifeos-chart-baseline, .lifeos-page-transition, .lifeos-modal-overlay, .lifeos-modal-card { animation:none !important; }
+    * { scroll-behavior:auto !important; }
+  }
 
   :root { --lifeos-card-bg: #141416; --lifeos-card-border:#27272a; --lifeos-text:#f4f4f5; --lifeos-muted:#8e8e93; --lifeos-card:#141416; }
 
@@ -748,7 +803,11 @@ function DashboardMiniLine({ data, theme }: { data: MoneyPoint[]; theme: any }) 
   const values = data.length ? data.map(p=>Number(p.value)||0) : [0];
   const min = Math.min(...values), max = Math.max(...values), range = max-min || Math.max(1,Math.abs(max)*0.08);
   const points = values.map((v,i)=>{const x=data.length<=1?50:(i/(data.length-1))*100; const y=92-((v-(min-range*.15))/(range*1.3))*78; return `${x},${Math.max(8,Math.min(92,y))}`;}).join(' ');
-  return <svg viewBox='0 0 100 100' preserveAspectRatio='none' width='100%' height='100%'><line x1='0' y1='92' x2='100' y2='92' stroke={theme.cardBorder}/><polyline points={points} fill='none' stroke={theme.text} strokeWidth='2.2' strokeLinecap='round' strokeLinejoin='round'/></svg>;
+  return <svg className='lifeos-chart-epic' viewBox='0 0 100 100' preserveAspectRatio='none' width='100%' height='100%'>
+    <defs><filter id='lifeosGlow'><feGaussianBlur stdDeviation='1.1' result='blur'/><feMerge><feMergeNode in='blur'/><feMergeNode in='SourceGraphic'/></feMerge></filter></defs>
+    <line className='lifeos-chart-baseline' x1='0' y1='92' x2='100' y2='92' stroke={theme.cardBorder}/>
+    <polyline className='lifeos-chart-line' pathLength='1' points={points} fill='none' stroke={theme.text} strokeWidth='2.2' strokeLinecap='round' strokeLinejoin='round' filter='url(#lifeosGlow)'/>
+  </svg>;
 }
 
 export default function App() {
@@ -776,11 +835,12 @@ export default function App() {
     }
   });
 
-  const [activeTab, setActiveTab] = useState<'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes'>('inicio');
-  const [studySubTab, setStudySubTab] = useState<'semestre' | 'materias' | 'malla' | 'horario' | 'calendario' | 'historial'>('materias');
+  const [activeTab, setActiveTab] = useState<'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes'>(() => { try { return (sessionStorage.getItem('lifeos_ui_active_tab') as any) || 'inicio'; } catch { return 'inicio'; } });
+  const [studySubTab, setStudySubTab] = useState<'semestre' | 'materias' | 'malla' | 'horario' | 'calendario' | 'historial'>(() => { try { return (sessionStorage.getItem('lifeos_ui_study_tab') as any) || 'materias'; } catch { return 'materias'; } });
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [todoFilter, setTodoFilter] = useState<'Todas' | 'Pendientes' | 'Completadas'>('Todas');
-  const [habitSubTab, setHabitSubTab] = useState<'dia' | 'semana' | 'mes'>('dia');
+  const [habitSubTab, setHabitSubTab] = useState<'dia' | 'semana' | 'mes'>(() => { try { return (sessionStorage.getItem('lifeos_ui_habit_tab') as any) || 'dia'; } catch { return 'dia'; } });
+  const [habitWeekOffset, setHabitWeekOffset] = useState<number>(0);
 
   const [dashboardAccountFilter, setDashboardAccountFilter] = useState<string>(() => localStorage.getItem('lifeos_dash_acc_filter') || 'all');
   const [dashboardBackground, setDashboardBackground] = useState<string>(() => localStorage.getItem('lifeos_dashboard_bg') || '');
@@ -833,10 +893,10 @@ export default function App() {
   const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState<string>(() => localStorage.getItem('lifeos_spotify') || 'https://open.spotify.com/playlist/37i9dQZF1DX8Uebhn9wzrS');
   const [musicWidgetEnabled, setMusicWidgetEnabled] = useState<boolean>(() => localStorage.getItem('lifeos_music_widget_enabled') !== 'false');
 
-  // SES UChile: por defecto queda en modo de prueba con 2026-2.
-  // Cuando empieces la carrera, puedes activar el período automático (2027-1 para semestre 1).
-  const [sesTestPeriod, setSesTestPeriod] = useState<string>(() => localStorage.getItem('lifeos_ses_test_period') || '2026-2');
-  const [sesUseAutomaticPeriod, setSesUseAutomaticPeriod] = useState<boolean>(() => localStorage.getItem('lifeos_ses_auto_period') === 'true');
+  // SES UChile: desde v25 queda preparado para la carrera real.
+  // Semestre 1 de 2027 → 2027-1 automáticamente.
+  const [sesTestPeriod, setSesTestPeriod] = useState<string>(() => localStorage.getItem('lifeos_ses_test_period') || '2027-1');
+  const [sesUseAutomaticPeriod, setSesUseAutomaticPeriod] = useState<boolean>(() => localStorage.getItem('lifeos_ses_auto_period') !== 'false');
   const [sesEvaluations, setSesEvaluations] = useState<SesEvaluation[]>([]);
   const [sesStatus, setSesStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
   const [sesMessage, setSesMessage] = useState<string>('');
@@ -938,6 +998,7 @@ export default function App() {
       return Array.isArray(saved) && saved.length ? saved.map(Number).filter((n:number)=>Number.isFinite(n) && n>0) : [24,2];
     } catch { return [24,2]; }
   });
+  const [emailSesChangesEnabled, setEmailSesChangesEnabled] = useState<boolean>(() => localStorage.getItem('lifeos_email_ses_changes_enabled') !== 'false');
   const [emailTestStatus, setEmailTestStatus] = useState<'idle' | 'sending' | 'ok' | 'error'>('idle');
   const [emailTestMessage, setEmailTestMessage] = useState<string>('');
 
@@ -1002,6 +1063,7 @@ export default function App() {
   const [newHabitCat, setNewHabitCat] = useState('Salud');
   const [newHabitFrequency, setNewHabitFrequency] = useState<'daily'|'weekly'>('daily');
   const [newHabitWeeklyTarget, setNewHabitWeeklyTarget] = useState('3');
+  const [newHabitDailyTarget, setNewHabitDailyTarget] = useState('1');
   const [newHabitIsBad, setNewHabitIsBad] = useState(false);
   const [newHabitHasEndDate, setNewHabitHasEndDate] = useState(false);
   const [newHabitEndDate, setNewHabitEndDate] = useState('');
@@ -1147,6 +1209,7 @@ export default function App() {
             completed: Boolean(h.completed),
             frequency: h.frequency === 'weekly' ? 'weekly' : 'daily',
             weeklyTarget: Math.min(7, Math.max(1, Number(h.weeklyTarget) || 3)),
+            dailyTarget: Math.min(6, Math.max(1, Number(h.dailyTarget) || 1)),
             isBad: Boolean(h.isBad),
             hasEndDate: Boolean(h.hasEndDate),
             endDate: typeof h.endDate === 'string' ? h.endDate : ''
@@ -1155,8 +1218,8 @@ export default function App() {
       }
     } catch {}
     return [
-      { id: 1, name: 'Entrenamiento Gimnasio', category: 'Salud', icon: '🏋️', streak: 6, completed: true },
-      { id: 2, name: 'Beber 2.5L de agua', category: 'Salud', icon: '💧', streak: 12, completed: true }
+      { id: 1, name: 'Entrenamiento Gimnasio', category: 'Salud', icon: '🏋️', streak: 6, completed: true, dailyTarget: 1 },
+      { id: 2, name: 'Beber 2.5L de agua', category: 'Salud', icon: '💧', streak: 12, completed: true, dailyTarget: 1 }
     ];
   });
 
@@ -1247,11 +1310,55 @@ export default function App() {
       localStorage.setItem('lifeos_email_class_minutes', String(Math.max(1, Math.min(180, Number(emailClassMinutes) || 20))));
       localStorage.setItem('lifeos_email_evaluation_enabled', String(emailEvaluationEnabled));
       localStorage.setItem('lifeos_email_evaluation_offsets', JSON.stringify(emailEvaluationOffsets));
+      localStorage.setItem('lifeos_email_ses_changes_enabled', String(emailSesChangesEnabled));
       localStorage.setItem('lifeos_career_seed_version', LIFEOS_CAREER_SEED_VERSION);
     } catch (e) {
       console.error(e);
     }
-  }, [darkMode, studentName, currentSemesterName, careerName, careerYears, currentSemesterNumber, dashboardAccountFilter, dashboardBackground, soundsEnabled, semStartDate, semEndDate, semesterDateConfig, academicBreaks, bookmarks, curriculum, spotifyEmbedUrl, musicWidgetEnabled, sesTestPeriod, sesUseAutomaticPeriod, sesScheduleRoomChoices, sesScheduleSectionChoices, sesScheduleBackup, sesClassNotificationsEnabled, accountsList, transactions, savingGoals, subjects, archivedSemesters, habits, habitLog, academicTasks, personalTodos, shoppingItems, notificationsEnabled, emailCenterEnabled, emailAddress, emailDailyEnabled, emailDailyTime, emailClassEnabled, emailClassMinutes, emailEvaluationEnabled, emailEvaluationOffsets]);
+  }, [darkMode, studentName, currentSemesterName, careerName, careerYears, currentSemesterNumber, dashboardAccountFilter, dashboardBackground, soundsEnabled, semStartDate, semEndDate, semesterDateConfig, academicBreaks, bookmarks, curriculum, spotifyEmbedUrl, musicWidgetEnabled, sesTestPeriod, sesUseAutomaticPeriod, sesScheduleRoomChoices, sesScheduleSectionChoices, sesScheduleBackup, sesClassNotificationsEnabled, accountsList, transactions, savingGoals, subjects, archivedSemesters, habits, habitLog, academicTasks, personalTodos, shoppingItems, notificationsEnabled, emailCenterEnabled, emailAddress, emailDailyEnabled, emailDailyTime, emailClassEnabled, emailClassMinutes, emailEvaluationEnabled, emailEvaluationOffsets, emailSesChangesEnabled]);
+
+  // v25: limpia exclusivamente los datos SES de prueba 2026-2 y deja LifeOS listo para 2027-1.
+  useEffect(() => {
+    const migrationKey = 'lifeos_v25_qf2027_cleanup_done';
+    if (localStorage.getItem(migrationKey) === 'true') return;
+    setSesUseAutomaticPeriod(true);
+    setSesTestPeriod('2027-1');
+    localStorage.setItem('lifeos_ses_auto_period', 'true');
+    localStorage.setItem('lifeos_ses_test_period', '2027-1');
+    setAcademicTasks(prev => prev.filter(task => !(task.source === 'ses_uchile' && task.externalPeriod === '2026-2')));
+    setSubjects(prev => prev.map(subject => ({
+      ...subject,
+      scheduleBlocks: (subject.scheduleBlocks || []).filter(block => !(block.source === 'ses_uchile' && block.externalPeriod === '2026-2'))
+    })));
+    setAcademicBreaks(prev => prev.filter(b => !(b.startDate.startsWith('2026-') || b.endDate.startsWith('2026-'))));
+    localStorage.setItem(migrationKey, 'true');
+  }, []);
+
+  // Si una sincronización antigua volviera a traer datos de prueba, los limpia otra vez sin tocar datos reales.
+  useEffect(() => {
+    const hasOldTasks = academicTasks.some(task => task.source === 'ses_uchile' && task.externalPeriod === '2026-2');
+    if (hasOldTasks) setAcademicTasks(prev => prev.filter(task => !(task.source === 'ses_uchile' && task.externalPeriod === '2026-2')));
+    const hasOldBlocks = subjects.some(subject => (subject.scheduleBlocks || []).some(block => block.source === 'ses_uchile' && block.externalPeriod === '2026-2'));
+    if (hasOldBlocks) setSubjects(prev => prev.map(subject => ({...subject,scheduleBlocks:(subject.scheduleBlocks || []).filter(block => !(block.source === 'ses_uchile' && block.externalPeriod === '2026-2'))})));
+  }, [academicTasks, subjects]);
+
+  const prepareQF2027 = () => {
+    setCurrentSemesterNumber(1);
+    setCurrentSemesterName('Semestre 1 - 2027');
+    setSesUseAutomaticPeriod(true);
+    setSesTestPeriod('2027-1');
+    setAcademicTasks(prev => prev.filter(task => !(task.source === 'ses_uchile' && task.externalPeriod === '2026-2')));
+    setSubjects(buildSemesterSubjects(1, archivedSemesters).map(subject => ({
+      ...subject,
+      scheduleBlocks: (subject.scheduleBlocks || []).filter(block => !(block.source === 'ses_uchile' && block.externalPeriod === '2026-2'))
+    })));
+    setSesEvaluations([]);
+    setSesScheduleRows([]);
+    setSesStatus('idle');
+    setSesScheduleStatus('idle');
+    setSesMessage('Listo para Semestre 1 · 2027. SES usará automáticamente 2027-1.');
+    setSesScheduleMessage('');
+  };
 
   const runCloudSync = async (mode: 'auto' | 'push' | 'pull' = 'auto') => {
     if (!cloudConfigured()) {
@@ -1295,14 +1402,20 @@ export default function App() {
         setCloudLastSync(pushed.updated_at);
         setCloudMessage('Este dispositivo subió sus datos a LifeOS Cloud.');
       } else if (remote && (!meta.updatedAt || new Date(remote.updated_at).getTime() > new Date(meta.updatedAt).getTime()) && remote.updated_at !== meta.updatedAt) {
-        // Primera conexión de un dispositivo: si ya existe una copia remota, esa copia es la fuente de verdad.
-        cloudApplySnapshot(remote.data || {});
-        const signature = getSnapshotSignature(remote.data || {});
-        saveCloudMeta({ updatedAt: remote.updated_at, signature });
+        // En la primera conexión sí cargamos la nube automáticamente.
+        // Después de eso NO forzamos recargas automáticas: otro dispositivo, una pestaña antigua
+        // o una escritura remota podría provocar un bucle de refresh y devolverte al Dashboard.
+        if (!meta.updatedAt) {
+          cloudApplySnapshot(remote.data || {});
+          const signature = getSnapshotSignature(remote.data || {});
+          saveCloudMeta({ updatedAt: remote.updated_at, signature });
+          setCloudLastSync(remote.updated_at);
+          setCloudMessage('Datos de LifeOS Cloud cargados.');
+          window.location.reload();
+          return;
+        }
         setCloudLastSync(remote.updated_at);
-        setCloudMessage('Encontré una versión más nueva en la nube. Actualizando este dispositivo…');
-        window.location.reload();
-        return;
+        setCloudMessage('Hay cambios más nuevos en LifeOS Cloud. Usa “Descargar nube” si quieres aplicarlos en este dispositivo.');
       } else if (!remote) {
         const pushed = await cloudPushSnapshot(session, localSnapshot);
         saveCloudMeta({ updatedAt: pushed.updated_at, signature: localSignature });
@@ -1682,12 +1795,12 @@ export default function App() {
     return { sub, evals, passingGrade, projectedAverage, enteredWeight, missingWeight, effectiveGrade, requiredFor };
   })();
 
-  const approvedSct = curriculum.filter(c => c.status === 'aprobado').reduce((a,c) => a + (c.credits||0), 0);
+  const approvedSct = curriculum.filter(c => ['aprobado','convalidado'].includes(c.status)).reduce((a,c) => a + (c.credits||0), 0);
   const totalSct = curriculum.reduce((a,c) => a + (c.credits||0), 0) || 330;
   const sctProgress = Math.min(100, Math.round((approvedSct / totalSct) * 100));
   const semesterHistory = Array.from({length: 11}, (_,i) => i+1).map(sem => {
     const rows = curriculum.filter(c => c.semester === sem);
-    return { sem, rows, approved: rows.filter(c => c.status === 'aprobado').length, sct: rows.filter(c => c.status === 'aprobado').reduce((a,c)=>a+(c.credits||0),0), total: rows.reduce((a,c)=>a+(c.credits||0),0) };
+    return { sem, rows, approved: rows.filter(c => ['aprobado','convalidado'].includes(c.status)).length, sct: rows.filter(c => ['aprobado','convalidado'].includes(c.status)).reduce((a,c)=>a+(c.credits||0),0), total: rows.reduce((a,c)=>a+(c.credits||0),0) };
   });
 
 
@@ -1706,6 +1819,7 @@ export default function App() {
   };
 
   const getCurriculumSubjectStatus = (currSub: CurriculumSubject) => {
+    if (currSub.status === 'convalidado') return { status: 'convalidado' as const, grade: null };
     const activeMatch = subjects.find(s => s.name.trim().toLowerCase() === currSub.name.trim().toLowerCase());
     if (activeMatch) {
       const stats = calculateSubjectMetrics(activeMatch);
@@ -1719,6 +1833,75 @@ export default function App() {
       return { status: 'cursando' as const, grade: stats.currentAverage };
     }
     return { status: currSub.status, grade: currSub.finalGrade || null };
+  };
+
+  const runViewTransition = (action: () => void) => {
+    const doc = document as Document & { startViewTransition?: (callback: () => void) => void };
+    if (doc.startViewTransition && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) doc.startViewTransition(action);
+    else action();
+  };
+
+  const navigateTab = (tab: 'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes') => runViewTransition(() => { try { sessionStorage.setItem('lifeos_ui_active_tab', tab); } catch {} setActiveTab(tab); });
+  const navigateStudyTab = (tab: 'semestre' | 'materias' | 'malla' | 'horario' | 'calendario' | 'historial') => runViewTransition(() => { try { sessionStorage.setItem('lifeos_ui_study_tab', tab); } catch {} setStudySubTab(tab); });
+
+  useEffect(() => { try { sessionStorage.setItem('lifeos_ui_active_tab', activeTab); } catch {} }, [activeTab]);
+  useEffect(() => { try { sessionStorage.setItem('lifeos_ui_study_tab', studySubTab); } catch {} }, [studySubTab]);
+  useEffect(() => { try { sessionStorage.setItem('lifeos_ui_habit_tab', habitSubTab); } catch {} }, [habitSubTab]);
+
+
+  // Mantiene Malla ↔ Ramos sincronizados con las notas reales. Los estados manuales tienen prioridad.
+  useEffect(() => {
+    setCurriculum(prev => {
+      let changed = false;
+      const next = prev.map(item => {
+        if (item.statusSource === 'manual' || item.status === 'convalidado') return item;
+        const active = subjects.find(s => s.name.trim().toLowerCase() === item.name.trim().toLowerCase());
+        if (!active) return item;
+        const stats = calculateSubjectMetrics(active);
+        let nextStatus: CurriculumSubject['status'] = 'cursando';
+        let nextGrade: number | null = stats.currentAverage || null;
+        if (stats.gradedWeight === 100) {
+          if (stats.isExempted) {
+            nextStatus = 'aprobado';
+            nextGrade = stats.currentAverage;
+          } else if (stats.finalGradeCalculated !== null) {
+            nextStatus = stats.finalGradeCalculated >= 4.0 ? 'aprobado' : 'reprobado';
+            nextGrade = stats.finalGradeCalculated;
+          } else if (stats.opportunitiesCount === 0) {
+            nextStatus = 'reprobado';
+            nextGrade = stats.currentAverage;
+          }
+        }
+        const nextSource = (nextStatus === 'aprobado' || nextStatus === 'reprobado') ? 'grades' as const : undefined;
+        if (item.status !== nextStatus || item.finalGrade !== nextGrade || item.statusSource !== nextSource) {
+          changed = true;
+          return { ...item, status: nextStatus, finalGrade: nextGrade, statusSource: nextSource };
+        }
+        return item;
+      });
+      return changed ? next : prev;
+    });
+  }, [subjects]);
+
+  const setCurriculumManualStatus = (item: CurriculumSubject, nextStatus: CurriculumSubject['status']) => {
+    const normalized = item.name.trim().toLowerCase();
+    setCurriculum(prev => prev.map(c => c.id === item.id ? {
+      ...c,
+      status: nextStatus,
+      statusSource: nextStatus === 'pendiente' || nextStatus === 'cursando' ? undefined : 'manual',
+      finalGrade: nextStatus === 'aprobado' ? (c.finalGrade ?? null) : null,
+    } : c));
+
+    if (nextStatus === 'convalidado' || nextStatus === 'aprobado') {
+      setSubjects(prev => prev.filter(sub => sub.name.trim().toLowerCase() !== normalized));
+      return;
+    }
+
+    if (item.semester === currentSemesterNumber) {
+      setSubjects(prev => prev.some(sub => sub.name.trim().toLowerCase() === normalized)
+        ? prev
+        : [...prev, makeQyFSubject({ ...item, status: 'pendiente', statusSource: undefined })]);
+    }
   };
 
   const theme = {
@@ -1768,6 +1951,7 @@ export default function App() {
     setNewHabitCat('Salud');
     setNewHabitFrequency('daily');
     setNewHabitWeeklyTarget('3');
+    setNewHabitDailyTarget('1');
     setNewHabitIsBad(false);
     setNewHabitHasEndDate(false);
     setNewHabitEndDate('');
@@ -1785,6 +1969,7 @@ export default function App() {
     setNewHabitCat(habit.category || 'Salud');
     setNewHabitFrequency(habit.frequency === 'weekly' ? 'weekly' : 'daily');
     setNewHabitWeeklyTarget(String(habit.weeklyTarget || 3));
+    setNewHabitDailyTarget(String(habit.dailyTarget || 1));
     setNewHabitIsBad(Boolean(habit.isBad));
     setNewHabitHasEndDate(Boolean(habit.hasEndDate));
     setNewHabitEndDate(habit.endDate || '');
@@ -1813,7 +1998,7 @@ export default function App() {
   };
 
 
-  // Permite probar horarios de un período histórico (por ejemplo 2026-2) aunque tu semestre real esté configurado para 2027.
+  // También permite un período manual si alguna vez necesitas revisar un semestre distinto al activo.
   // Los feriados, recesos y paros explícitos siguen anulando la clase.
   const dateBelongsToSesPeriod = (dateStr: string, period?: string) => {
     const match = String(period || '').match(/^(\d{4})-([12])$/);
@@ -2218,7 +2403,7 @@ export default function App() {
     const period = activeSesPeriod;
     if (!/^\d{4}-[12]$/.test(period)) {
       setSesStatus('error');
-      setSesMessage('Usa un período con formato AAAA-1 o AAAA-2, por ejemplo 2026-2.');
+      setSesMessage('Usa un período con formato AAAA-1 o AAAA-2, por ejemplo 2027-1.');
       return;
     }
     setSesStatus('loading');
@@ -2280,7 +2465,8 @@ export default function App() {
         source: 'ses_uchile',
         externalId,
         externalPeriod: String(ev.periodo || period),
-        externalUpdatedAt: String(ev.created_at || '')
+        externalUpdatedAt: String(ev.created_at || ''),
+        externalRoom: String(ev.sala || '').trim()
       };
       const existingIndex = next.findIndex(task => task.source === 'ses_uchile' && Number(task.externalId) === externalId);
       if (existingIndex >= 0) {
@@ -2309,7 +2495,8 @@ export default function App() {
           source: 'ses_uchile',
           externalId,
           externalPeriod: String(ev.periodo || period),
-          externalUpdatedAt: String(ev.created_at || '')
+          externalUpdatedAt: String(ev.created_at || ''),
+          externalRoom: String(ev.sala || '').trim()
         });
         created += 1;
       }
@@ -2356,26 +2543,73 @@ export default function App() {
     return copy;
   };
 
-  const toggleHabitOnDate = (habitId: number, date: string) => {
+  const habitDailyTarget = (habitId: number) => Math.min(6, Math.max(1, Number(habits.find(h => h.id === habitId)?.dailyTarget) || 1));
+
+  const habitOccurrenceCountOn = (habitId: number, date: string) => {
+    const log = habitLog[String(habitId)] || [];
+    const target = habitDailyTarget(habitId);
+    // Compatibilidad: un registro antiguo con la fecha sola significa “día completo”.
+    if (log.includes(date)) return target;
+    let count = 0;
+    for (let i = 1; i <= target; i++) if (log.includes(`${date}#${i}`)) count++;
+    const localToday = formatLocalDate(new Date());
+    if (count === 0 && date === localToday && Boolean(habits.find(h => h.id === habitId)?.completed)) return target;
+    return count;
+  };
+
+  const syncHabitCompletedToday = (habitId: number, nextLog: Record<string, string[]>) => {
+    const today = formatLocalDate(new Date());
+    const key = String(habitId);
+    const target = habitDailyTarget(habitId);
+    const entries = nextLog[key] || [];
+    const done = entries.includes(today) || Array.from({length:target}, (_,i)=>`${today}#${i+1}`).every(token=>entries.includes(token));
+    setHabits(prev => prev.map(h => h.id === habitId ? { ...h, completed: done } : h));
+  };
+
+  const toggleHabitOccurrenceOnDate = (habitId: number, date: string, occurrenceIndex: number) => {
     const habit = habits.find(h => h.id === habitId);
     if (habit?.hasEndDate && habit.endDate && date > habit.endDate) return;
     const key = String(habitId);
-    const currentlyDone = (habitLog[key] || []).includes(date) || (date === formatLocalDate(new Date()) && Boolean(habit?.completed));
+    const target = habitDailyTarget(habitId);
+    const safeIndex = Math.max(1, Math.min(target, occurrenceIndex));
     setHabitLog(prev => {
-      const dates = new Set(prev[key] || []);
-      if (dates.has(date)) dates.delete(date); else dates.add(date);
-      return { ...prev, [key]: Array.from(dates).sort() };
+      const entries = new Set(prev[key] || []);
+      // Convierte un registro antiguo “día completo” a marcas individuales antes de editarlo.
+      if (entries.has(date)) {
+        entries.delete(date);
+        for (let i = 1; i <= target; i++) entries.add(`${date}#${i}`);
+      }
+      const token = `${date}#${safeIndex}`;
+      if (entries.has(token)) entries.delete(token); else entries.add(token);
+      const next = { ...prev, [key]: Array.from(entries).sort() };
+      if (date === formatLocalDate(new Date())) setTimeout(() => syncHabitCompletedToday(habitId, next), 0);
+      return next;
     });
-    if (date === formatLocalDate(new Date())) setHabits(prev => prev.map(h => h.id === habitId ? { ...h, completed: !currentlyDone } : h));
+  };
+
+  const toggleHabitOnDate = (habitId: number, date: string) => {
+    const target = habitDailyTarget(habitId);
+    const count = habitOccurrenceCountOn(habitId, date);
+    if (target === 1) return toggleHabitOccurrenceOnDate(habitId, date, 1);
+    // En vistas compactas: avanza 0→1→…→objetivo→0.
+    if (count >= target) {
+      const key = String(habitId);
+      setHabitLog(prev => {
+        const entries = new Set(prev[key] || []);
+        entries.delete(date);
+        for (let i=1;i<=target;i++) entries.delete(`${date}#${i}`);
+        const next = { ...prev, [key]: Array.from(entries).sort() };
+        if (date === formatLocalDate(new Date())) setTimeout(() => syncHabitCompletedToday(habitId, next), 0);
+        return next;
+      });
+      return;
+    }
+    toggleHabitOccurrenceOnDate(habitId, date, count + 1);
   };
 
   const toggleHabitToday = (habitId: number) => toggleHabitOnDate(habitId, formatLocalDate(new Date()));
 
-  const isHabitDoneOn = (habitId: number, date: string) => {
-    const log = habitLog[String(habitId)] || [];
-    const localToday = formatLocalDate(new Date());
-    return log.includes(date) || (date === localToday && Boolean(habits.find(h => h.id === habitId)?.completed));
-  };
+  const isHabitDoneOn = (habitId: number, date: string) => habitOccurrenceCountOn(habitId, date) >= habitDailyTarget(habitId);
 
   const habitStreak = (habitId: number) => {
     let streak = 0;
@@ -2409,6 +2643,14 @@ export default function App() {
   currentWeekStart.setHours(0, 0, 0, 0);
   const currentWeekEnd = shiftLocalDate(currentWeekStart, 6);
   currentWeekEnd.setHours(23, 59, 59, 999);
+  const habitWeekStart = shiftLocalDate(currentWeekStart, habitWeekOffset * 7);
+  habitWeekStart.setHours(0, 0, 0, 0);
+  const habitWeekEnd = shiftLocalDate(habitWeekStart, 6);
+  habitWeekEnd.setHours(23, 59, 59, 999);
+  const habitWeekDays = Array.from({ length: 7 }, (_, i) => shiftLocalDate(habitWeekStart, i));
+  const displayedHabitWeekCompletions = habits.reduce((sum, h) => sum + habitCountBetween(h.id, habitWeekStart, habitWeekEnd), 0);
+  const displayedHabitWeekPossible = habits.length * 7;
+  const displayedHabitWeekRate = displayedHabitWeekPossible ? Math.round((displayedHabitWeekCompletions / displayedHabitWeekPossible) * 100) : 0;
 
   const monthStart = new Date(habitReferenceDate.getFullYear(), habitReferenceDate.getMonth(), 1);
   const monthEnd = new Date(habitReferenceDate.getFullYear(), habitReferenceDate.getMonth() + 1, 0);
@@ -2549,7 +2791,7 @@ export default function App() {
     });
 
     const regular = curriculum
-      .filter(c => c.semester === semesterNumber && c.status !== 'aprobado')
+      .filter(c => c.semester === semesterNumber && c.status !== 'aprobado' && c.status !== 'convalidado')
       .map(makeQyFSubject);
 
     const repeats = [...byName.values()]
@@ -2567,6 +2809,8 @@ export default function App() {
     const year = 2027 + Math.floor((semesterNumber - 1) / 2);
     setCurrentSemesterNumber(semesterNumber);
     setCurrentSemesterName(`Semestre ${semesterNumber} - ${year}`);
+    setSesUseAutomaticPeriod(true);
+    setSesTestPeriod(sesPeriodForSemester(semesterNumber));
     setSubjects(buildSemesterSubjects(semesterNumber, archivedSemesters));
     setAcademicTasks([]);
   };
@@ -2591,9 +2835,26 @@ export default function App() {
     const year = 2027 + Math.floor((nextSemester - 1) / 2);
     setCurrentSemesterNumber(nextSemester);
     setCurrentSemesterName(`Semestre ${nextSemester} - ${year}`);
+    setSesUseAutomaticPeriod(true);
+    setSesTestPeriod(sesPeriodForSemester(nextSemester));
     setSubjects(buildSemesterSubjects(nextSemester, nextHistory, subjects));
     setAcademicTasks([]);
     setStudySubTab('materias');
+  };
+
+  const clearAccountData = (accountId: string) => {
+    const account = accountsList.find(a => a.id === accountId);
+    if (!account) return;
+    const movementCount = transactions.filter(t => t.accountId === accountId).length;
+    const ok = window.confirm(
+      `¿Limpiar "${account.name}"?\n\nSe eliminarán ${movementCount} movimiento${movementCount === 1 ? '' : 's'} y el saldo quedará en $0.\n\nEsta acción no se puede deshacer.`
+    );
+    if (!ok) return;
+
+    setTransactions(prev => prev.filter(t => t.accountId !== accountId));
+    setAccountsList(prev => prev.map(a => a.id === accountId ? { ...a, balance: 0 } : a));
+    if (dashboardAccountFilter === accountId) setDashboardAccountFilter(accountId);
+    playUISound('tick');
   };
 
   const totalBalance = accountsList.reduce((acc, a) => acc + (Number(a.balance) || 0), 0);
@@ -2633,7 +2894,7 @@ export default function App() {
 
   const totalSemesters = careerYears * 2;
   const currentSemesterMallaSubjects = curriculum.filter(c => c.semester === currentSemesterNumber);
-  const currentSemesterApprovedCount = currentSemesterMallaSubjects.filter(c => getCurriculumSubjectStatus(c).status === 'aprobado').length;
+  const currentSemesterApprovedCount = currentSemesterMallaSubjects.filter(c => ['aprobado','convalidado'].includes(getCurriculumSubjectStatus(c).status)).length;
   const currentSemesterProgress = currentSemesterMallaSubjects.length > 0 ? Math.round((currentSemesterApprovedCount / currentSemesterMallaSubjects.length) * 100) : 0;
 
   const rawScheduleFromSubjects: ScheduleBlock[] = subjects
@@ -2723,25 +2984,9 @@ export default function App() {
   const masterStartingDayOfWeek = masterFirstDayOfMonth.getDay() === 0 ? 6 : masterFirstDayOfMonth.getDay() - 1;
   const masterMonthCalendarDates = Array.from({ length: masterDaysInMonth }, (_, i) => new Date(masterYear, masterMonth, i + 1));
 
-  const calendarCoverageDates = Array.from(new Map(
-    [...monthCalendarDates, ...masterMonthCalendarDates, ...masterWeekDays, dateFromLocalString(selectedCalendarDate)]
-      .map(date => [formatLocalDate(date), date] as const)
-  ).values());
-
-  const classEvents = calendarCoverageDates.flatMap(d => {
-    const dateStr = formatLocalDate(d);
-    const dayName = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][d.getDay()];
-    return subjects.flatMap(s => (s.scheduleBlocks || []).filter(b => b.day === dayName && isScheduleBlockActiveOnDate(b, dateStr)).map(b => ({
-      id: `class_${s.id}_${dateStr}_${b.id}`,
-      title: s.name,
-      subtitle: `Clase · ${b.startTime}–${b.endTime}${b.room ? ` · ${b.room}` : ''}`,
-      date: dateStr,
-      type: 'class' as const,
-      completed: false
-    })));
-  });
+  // El Calendario Maestro queda reservado para evaluaciones y To-Do.
+  // Los bloques de clases se muestran exclusivamente en Estudios → Horario.
   const calendarEvents = [
-    ...classEvents,
     ...academicTasks.filter(t => t.addToCalendar !== false && t.dueDate && t.dueDate !== 'Pronto').map(t => ({
       id: `acad_${t.id}`,
       title: t.title,
@@ -2762,10 +3007,9 @@ export default function App() {
 
   const getCalendarEventDots = (dateStr: string) => {
     const dots: { color: string; label: string }[] = [];
-    if (calendarEvents.some(e => e.date === dateStr && e.type === 'acad')) dots.push({ color: '#ef4444', label: 'Entrega universitaria' });
+    if (calendarEvents.some(e => e.date === dateStr && e.type === 'acad')) dots.push({ color: '#ef4444', label: 'Evaluación / entrega' });
     if (calendarEvents.some(e => e.date === dateStr && e.type === 'todo')) dots.push({ color: '#67e8f9', label: 'To-Do' });
-    if (calendarEvents.some(e => e.date === dateStr && e.type === 'class')) dots.push({ color: '#a78bfa', label: 'Clase' });
-    return dots.slice(0, 3);
+    return dots.slice(0, 2);
   };
 
   const selectedDateEvents = calendarEvents.filter(ev => ev.date === selectedCalendarDate);
@@ -2847,7 +3091,7 @@ export default function App() {
                 key={tab.id}
                 onClick={() => {
                   setSelectedAccountId(null);
-                  setActiveTab(tab.id as any);
+                  navigateTab(tab.id as 'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes');
                   if (isMobile) setSidebarOpen(false);
                 }}
                 style={{
@@ -2907,7 +3151,7 @@ export default function App() {
       )}
 
       {/* CONTENIDO PRINCIPAL */}
-      <main className="lifeos-main" style={{ flex: 1, padding: isMobile ? '12px' : '22px 30px', overflowY: 'auto', maxWidth: '100vw' }}>
+      <main className="lifeos-main lifeos-page-transition" style={{ flex: 1, padding: isMobile ? '12px' : '22px 30px', overflowY: 'auto', maxWidth: '100vw' }}>
         {isMobile && (
           <div className="lifeos-mobile-only lifeos-mobile-header" style={{ display: 'none', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', paddingBottom: '8px', borderBottom: `1px solid ${theme.cardBorder}` }}>
             <div style={{display:'flex',alignItems:'center',gap:10}}>
@@ -2954,15 +3198,13 @@ export default function App() {
         {activeTab === 'inicio' && (
           <div className="lifeos-dashboard">
             {(() => {
-              const todayTodos = personalTodos.filter(t => !t.completed && t.dueDate === todayStr).slice(0, 5);
-              const todayAcademic = academicTasks.filter(t => !t.completed && t.dueDate === todayStr).slice(0, 5);
+              const dashboardTodos = personalTodos.filter(t => !t.completed).sort((a,b) => String(a.dueDate || '9999-12-31').localeCompare(String(b.dueDate || '9999-12-31'))).slice(0, 6);
               const upcoming = [...academicTasks.filter(t => !t.completed && t.dueDate && t.dueDate >= todayStr)]
                 .sort((a,b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
                 .slice(0, 4);
               const latestGraded = subjects.flatMap(s => (s.evaluations || []).filter(e => e.grade !== null && e.grade !== undefined).map(e => ({ ...e, subjectName: s.name })))
                 .slice(-1)[0];
-              const todayClasses = calendarEvents.filter(e => e.date === todayStr && e.type === 'class').slice(0, 5);
-              const todayEvents = [...todayAcademic.map(t => ({ title: t.title, subtitle: `${t.subject} · ${t.type}`, time: t.startTime || '' })), ...todayTodos.map(t => ({ title: t.title, subtitle: `${t.category} · To-Do`, time: t.dueTime || '' })), ...todayClasses.map(c => ({ title: c.title, subtitle: c.subtitle, time: '' }))].slice(0, 6);
+              const todayEvents = dashboardTodos.map(t => ({ id: t.id, title: t.title, subtitle: `${t.category} · ${t.dueDate === todayStr ? 'Hoy' : (t.dueDate || 'Sin fecha')}`, time: t.dueTime || '' }));
               const dashboardDayName = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][todayDateObj.getDay()];
               const dashboardNowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
               const dashboardSchedule = subjects.flatMap(subject => (subject.scheduleBlocks || [])
@@ -3001,13 +3243,21 @@ export default function App() {
                 {/* Primera fila: Tareas · Saldo · Hábitos */}
                 <section className="lifeos-dashboard-grid lifeos-dashboard-grid-top">
                   <div className="lifeos-dash-card lifeos-dash-tall">
-                    <div className="lifeos-card-head"><div style={{display:'flex',alignItems:'center',gap:7}}><span className="lifeos-overline">TAREAS</span><button onClick={()=>setShowTodoModal(true)} title='Agregar tarea' style={{width:20,height:20,padding:0,border:'1px solid var(--lifeos-card-border)',borderRadius:6,background:'transparent',color:'var(--lifeos-text)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><Plus size={11}/></button><h3>{pendingTodos + pendingAcademicTasks} pendientes</h3></div><ListTodo size={18}/></div>
+                    <div className="lifeos-card-head"><div style={{display:'flex',alignItems:'center',gap:7}}><span className="lifeos-overline">TAREAS</span><button onClick={()=>setShowTodoModal(true)} title='Agregar tarea' style={{width:20,height:20,padding:0,border:'1px solid var(--lifeos-card-border)',borderRadius:6,background:'transparent',color:'var(--lifeos-text)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><Plus size={11}/></button><h3>{pendingTodos} pendientes</h3></div><ListTodo size={18}/></div>
                     <div className="lifeos-task-list">
-                      {todayEvents.length === 0 ? <div className="lifeos-empty">No tienes nada urgente para hoy.</div> : todayEvents.map((item, i) => (
-                        <div className="lifeos-mini-row" key={i}><span className="lifeos-check-dot"></span><div><strong>{item.title}</strong><small>{item.subtitle}{item.time ? ` · ${item.time}` : ''}</small></div></div>
+                      {todayEvents.length === 0 ? <div className="lifeos-empty">Tu To-Do está al día.</div> : todayEvents.map((item) => (
+                        <div className="lifeos-mini-row" key={item.id}>
+                          <button
+                            onClick={() => setPersonalTodos(prev => prev.map(td => td.id === item.id ? { ...td, completed: true } : td))}
+                            title="Marcar como lista"
+                            aria-label={`Marcar ${item.title} como lista`}
+                            style={{width:18,height:18,padding:0,border:'1px solid #777',borderRadius:6,background:'transparent',color:'var(--lifeos-text)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0}}
+                          ><CheckCircle2 size={11}/></button>
+                          <div><strong>{item.title}</strong><small>{item.subtitle}{item.time ? ` · ${item.time}` : ''}</small></div>
+                        </div>
                       ))}
                     </div>
-                    <button className="lifeos-text-button" onClick={() => setActiveTab('todos')}>Ver todo →</button>
+                    <button className="lifeos-text-button" onClick={() => navigateTab('todos')}>Ver todo →</button>
                   </div>
 
                   <div className="lifeos-dash-card lifeos-balance-card">
@@ -3017,16 +3267,16 @@ export default function App() {
                     <div style={{height:72,margin:'8px 0 4px',overflow:'hidden'}}><DashboardMiniLine data={dashboardMoneyChartData} theme={theme}/></div>
                     <div className="lifeos-balance-rule"></div>
                     <div className="lifeos-mini-stat"><span>Ingresos / gastos registrados</span><strong>{dashboardAccountFilter==='all'?transactions.length:transactions.filter(t=>t.accountId===dashboardAccountFilter).length}</strong></div>
-                    <button className="lifeos-text-button" onClick={() => setActiveTab('finanzas')}>Abrir Economía →</button>
+                    <button className="lifeos-text-button" onClick={() => navigateTab('finanzas')}>Abrir Economía →</button>
                   </div>
 
                   <div className="lifeos-dash-card lifeos-dash-tall">
                     <div className="lifeos-card-head"><div><span className="lifeos-overline">HÁBITOS</span><h3>{habitsDone} de {habits.length}</h3></div><div className="lifeos-ring" style={{background:`conic-gradient(${darkMode?'#f4f4f5':'#111113'} ${dashboardHabitRate * 3.6}deg, transparent 0)`,position:'relative'}}><span style={{width:29,height:29,borderRadius:'50%',background:theme.card,display:'flex',alignItems:'center',justifyContent:'center'}}>{dashboardHabitRate}%</span></div></div>
                     <div className="lifeos-task-list">
-                      {habits.slice(0, 5).map(h => <button key={h.id} className="lifeos-habit-row lifeos-habit-check" onClick={() => toggleHabitToday(h.id)}><span className={`lifeos-habit-box ${h.completed ? 'done' : ''}`}>{h.completed ? '✓' : ''}</span><span>{h.icon} {h.name}</span><small>{habitStreak(h.id)} días</small></button>)}
+                      {habits.slice(0, 5).map(h => { const target=habitDailyTarget(h.id); const count=habitOccurrenceCountOn(h.id,todayStr); const done=count>=target; return <button key={h.id} className="lifeos-habit-row lifeos-habit-check" onClick={() => toggleHabitToday(h.id)}><span className={`lifeos-habit-box ${done ? 'done' : ''}`}>{target>1 ? `${count}/${target}` : (done ? '✓' : '')}</span><span>{h.icon} {h.name}</span><small>{habitStreak(h.id)} días</small></button>})}
                       {habits.length === 0 && <div className="lifeos-empty">Agrega tu primer hábito.</div>}
                     </div>
-                    <button className="lifeos-text-button" onClick={() => setActiveTab('habitos')}>Ver hábitos →</button>
+                    <button className="lifeos-text-button" onClick={() => navigateTab('habitos')}>Ver hábitos →</button>
                   </div>
                 </section>
 
@@ -3035,7 +3285,7 @@ export default function App() {
                   <div className="lifeos-dash-card lifeos-span-2">
                     <div className="lifeos-card-head"><div><span className="lifeos-overline">PRÓXIMAS EVALUACIONES</span><h3>Lo que viene</h3></div><CalendarDays size={18}/></div>
                     {upcoming.length === 0 ? <div className="lifeos-empty">No hay evaluaciones próximas registradas.</div> : upcoming.map(t => <div className="lifeos-upcoming-row" key={t.id}><div><strong>{t.title}</strong><small>{t.subject} · {t.type}</small></div><span>{t.dueDate}{t.startTime ? ` · ${t.startTime}` : ''}</span></div>)}
-                    <button className="lifeos-text-button" onClick={() => { setActiveTab('estudios'); setStudySubTab('calendario'); }}>Ver entregas →</button>
+                    <button className="lifeos-text-button" onClick={() => { navigateTab('estudios'); setStudySubTab('calendario'); }}>Ver entregas →</button>
                   </div>
                   <div className="lifeos-dash-card">
                     <div className="lifeos-card-head"><div><span className="lifeos-overline">AGENDA DE HOY</span><h3>{todayEvents.length ? `${todayEvents.length} eventos` : 'Día despejado'}</h3></div><CalendarCheck2 size={18}/></div>
@@ -3047,19 +3297,19 @@ export default function App() {
                     </div>}
                     {todayEvents.slice(0,nextClassToday?3:4).map((item,i)=><div className="lifeos-mini-row" key={i}><span className="lifeos-time-dot"></span><div><strong>{item.title}</strong><small>{item.subtitle}{item.time?` · ${item.time}`:''}</small></div></div>)}
                     {todayEvents.length === 0 && !nextClassToday && <div className="lifeos-empty">Sin eventos en tu agenda de hoy.</div>}
-                    <button className="lifeos-text-button" onClick={() => setActiveTab('calendario')}>Calendario Maestro →</button>
+                    <button className="lifeos-text-button" onClick={() => navigateTab('calendario')}>Calendario Maestro →</button>
                   </div>
                 </section>
                 <section className="lifeos-dashboard-grid lifeos-dashboard-grid-middle">
                   <div className="lifeos-dash-card lifeos-span-2">
                     <div className="lifeos-card-head"><div><span className="lifeos-overline">CALENDARIO DEL MES</span><h3>{todayDateObj.toLocaleDateString('es-CL',{month:'long',year:'numeric'})}</h3></div><CalendarDays size={18}/></div>
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4,marginTop:10,fontSize:8,color:'var(--lifeos-muted)',textAlign:'center'}}>{['L','M','X','J','V','S','D'].map(d=><div key={d}>{d}</div>)}{Array.from({length:startingDayOfWeek}).map((_,i)=><div key={'e'+i}/>) }{monthCalendarDates.map(d=>{const ds=formatLocalDate(d);const has=calendarEvents.some(e=>e.date===ds);const isToday=ds===todayStr;const status=getDateAcademicStatus(ds);const dots=getCalendarEventDots(ds);const statusColor=status.type==='clases'?'#86efac':status.type==='receso_vacaciones'?'#52525b':status.type==='paro'?'#f59e0b':'#ef4444';return <button key={ds} title={status.label||''} onClick={()=>{setSelectedCalendarDate(ds);setMasterCalendarCursorDate(ds);setActiveTab('calendario');}} style={{height:34,padding:'3px 2px',borderRadius:6,border:isToday?'1px solid var(--lifeos-text)':'1px solid transparent',background:has?(darkMode?'#262629':'#eeeeef'):'transparent',color:'var(--lifeos-text)',fontSize:9,cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2}}><span>{d.getDate()}</span><span style={{width:'72%',height:2,borderRadius:99,background:statusColor,opacity:.9}}></span><span style={{height:3,display:'flex',gap:2,alignItems:'center'}}>{dots.map((dot,i)=><i key={i} title={dot.label} style={{width:3,height:3,borderRadius:'50%',background:dot.color,display:'block'}} />)}</span></button>})}</div>
-                    <button className="lifeos-text-button" onClick={() => setActiveTab('calendario')}>Abrir calendario →</button>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4,marginTop:10,fontSize:8,color:'var(--lifeos-muted)',textAlign:'center'}}>{['L','M','X','J','V','S','D'].map(d=><div key={d}>{d}</div>)}{Array.from({length:startingDayOfWeek}).map((_,i)=><div key={'e'+i}/>) }{monthCalendarDates.map(d=>{const ds=formatLocalDate(d);const has=calendarEvents.some(e=>e.date===ds);const isToday=ds===todayStr;const status=getDateAcademicStatus(ds);const dots=getCalendarEventDots(ds);const statusColor=status.type==='clases'?'#86efac':status.type==='receso_vacaciones'?'#52525b':status.type==='paro'?'#f59e0b':'#ef4444';return <button key={ds} title={status.label||''} onClick={()=>{setSelectedCalendarDate(ds);setMasterCalendarCursorDate(ds);navigateTab('calendario');}} style={{height:34,padding:'3px 2px',borderRadius:6,border:isToday?'1px solid var(--lifeos-text)':'1px solid transparent',background:has?(darkMode?'#262629':'#eeeeef'):'transparent',color:'var(--lifeos-text)',fontSize:9,cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2}}><span>{d.getDate()}</span><span style={{width:'72%',height:2,borderRadius:99,background:statusColor,opacity:.9}}></span><span style={{height:3,display:'flex',gap:2,alignItems:'center'}}>{dots.map((dot,i)=><i key={i} title={dot.label} style={{width:3,height:3,borderRadius:'50%',background:dot.color,display:'block'}} />)}</span></button>})}</div>
+                    <button className="lifeos-text-button" onClick={() => navigateTab('calendario')}>Abrir calendario →</button>
                   </div>
                   <div className="lifeos-dash-card">
                     <div className="lifeos-card-head"><div><span className="lifeos-overline">OBJETIVOS</span><h3>Ahorro en progreso</h3></div><Target size={18}/></div>
                     {goalInProgress.length === 0 ? <div className="lifeos-empty">No tienes objetivos activos.</div> : goalInProgress.map(g => { const pct = Math.min(100, Math.round(g.currentAmount / Math.max(1,g.targetAmount) * 100)); return <div className="lifeos-goal-row" key={g.id}><div><strong>{g.emoji} {g.title}</strong><small>{formatCLP(g.currentAmount)} / {formatCLP(g.targetAmount)}</small></div><div className="lifeos-progress"><span style={{width:`${pct}%`}}></span></div><small className="lifeos-goal-pct">{pct}%</small></div>; })}
-                    <button className="lifeos-text-button" onClick={() => setActiveTab('finanzas')}>Ver objetivos →</button>
+                    <button className="lifeos-text-button" onClick={() => navigateTab('finanzas')}>Ver objetivos →</button>
                   </div>
                 </section>
 
@@ -3068,14 +3318,14 @@ export default function App() {
                   <div className="lifeos-dash-card">
                     <div className="lifeos-card-head"><div><span className="lifeos-overline">ÚLTIMA NOTA</span><h3>{latestGraded ? latestGraded.subjectName : 'Sin notas todavía'}</h3></div><BookOpen size={18}/></div>
                     {latestGraded ? <><div className="lifeos-grade-big">{Number(latestGraded.grade).toFixed(1)}</div><div className="lifeos-muted-line">{latestGraded.name}</div></> : <div className="lifeos-empty">Registra una nota desde Ramos & Notas.</div>}
-                    <button className="lifeos-text-button" onClick={() => { setActiveTab('estudios'); setStudySubTab('materias'); }}>Ramos & Notas →</button>
+                    <button className="lifeos-text-button" onClick={() => { navigateTab('estudios'); setStudySubTab('materias'); }}>Ramos & Notas →</button>
                   </div>
                   <div className="lifeos-dash-card">
                     <div className="lifeos-card-head"><div><span className="lifeos-overline">ESTUDIOS</span><h3>{currentSemesterProgress}% del semestre</h3></div><GraduationCap size={18}/></div>
                     <div className="lifeos-progress lifeos-progress-large"><span style={{width:`${currentSemesterProgress}%`}}></span></div>
                     <div className="lifeos-muted-line">{currentSemesterApprovedCount} de {currentSemesterMallaSubjects.length || subjects.length} ramos aprobados</div>
                     <div className="lifeos-sct-line"><strong>{approvedSct}</strong> / {totalSct} SCT acumulados</div>
-                    <button className="lifeos-text-button" onClick={() => { setActiveTab('estudios'); setStudySubTab('malla'); }}>Ver malla →</button>
+                    <button className="lifeos-text-button" onClick={() => { navigateTab('estudios'); setStudySubTab('malla'); }}>Ver malla →</button>
                   </div>
                 </section>
 
@@ -3120,7 +3370,7 @@ export default function App() {
                         <div style={{fontSize:9,color:'var(--lifeos-muted)',marginTop:2}}>Completando todos tus hábitos diarios</div>
                       </div>
                     </div>
-                    <button className="lifeos-text-button" onClick={() => setActiveTab('habitos')} style={{margin:0,whiteSpace:'nowrap'}}>Ver hábitos →</button>
+                    <button className="lifeos-text-button" onClick={() => navigateTab('habitos')} style={{margin:0,whiteSpace:'nowrap'}}>Ver hábitos →</button>
                   </div>
                 </section>
 
@@ -3195,13 +3445,17 @@ export default function App() {
                     <div>
                       <h2 style={{ fontSize: '16px', fontWeight: '900', margin: 0 }}>Período Académico</h2>
                       <span style={{ fontSize: '12px', color: theme.textMuted }}>{activeSemesterDates.start} al {activeSemesterDates.end}</span>
+                      <div style={{fontSize:10,color:theme.textMuted,marginTop:4}}>Base real: Semestre {currentSemesterNumber} · {sesPeriodForSemester(currentSemesterNumber)} en SES. Al cambiar de semestre, LifeOS cambia el período y los ramos activos automáticamente; solo tendrás que revisar/importar SES si existen secciones o salas ambiguas.</div>
                     </div>
 
+                    <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+                    <button onClick={prepareQF2027} title="Limpia datos SES de prueba 2026-2 y vuelve al inicio real de la carrera" style={{ padding: '8px 12px', backgroundColor: 'transparent', color: theme.text, border: `1px solid ${theme.cardBorder}`, borderRadius: '10px', fontWeight: '900', fontSize: '10px', cursor: 'pointer' }}>Preparar Q&F 2027</button>
                     <button 
                       onClick={() => setShowBreakModal(true)}
                       style={{ padding: '8px 14px', backgroundColor: theme.primary, color: darkMode ? '#090909' : '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Plus size={15} /> + Receso o Paro
                     </button>
+                    </div>
                   </div>
 
 
@@ -3425,8 +3679,12 @@ export default function App() {
                     <span>Aprobado (Verde)</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '12px', backgroundColor: '#34d399', borderRadius: '3px', boxShadow:'0 0 0 2px #34d39922' }}></div>
+                    <span>Convalidado (Verde menta)</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <div style={{ width: '12px', height: '12px', backgroundColor: theme.primary, borderRadius: '3px' }}></div>
-                    <span>Reprobado (Rojo)</span>
+                    <span>Reprobado</span>
                   </div>
                 </div>
 
@@ -3447,6 +3705,7 @@ export default function App() {
                             semSubjects.map(item => {
                               const sync = getCurriculumSubjectStatus(item);
                               const isApproved = sync.status === 'aprobado';
+                              const isValidated = sync.status === 'convalidado';
                               const isFailed = sync.status === 'reprobado';
 
                               let borderColor = theme.cardBorder;
@@ -3454,6 +3713,9 @@ export default function App() {
                               if (isApproved) {
                                 borderColor = '#10b981';
                                 badgeColor = '#10b981';
+                              } else if (isValidated) {
+                                borderColor = '#34d399';
+                                badgeColor = '#34d399';
                               } else if (isFailed) {
                                 borderColor = theme.primary;
                                 badgeColor = theme.primary;
@@ -3462,12 +3724,25 @@ export default function App() {
                               return (
                                 <div key={item.id} style={{ backgroundColor: darkMode ? '#0e1017' : '#f8f9fa', border: `1.5px solid ${borderColor}`, borderRadius: '10px', padding: '10px' }}>
                                   <div style={{ fontWeight: '800', fontSize: '12px' }}>{item.name}</div>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', fontSize: '10px' }}>
-                                    <span style={{ color: badgeColor, fontWeight: 'bold' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', fontSize: '10px', gap:6 }}>
+                                    <span style={{ color: badgeColor, fontWeight: 'bold', textTransform:'capitalize' }}>
                                       {sync.grade ? `${sync.status} (${Number(sync.grade).toFixed(1)})` : sync.status}
                                     </span>
                                     <span style={{ color: theme.textMuted }}>{item.credits} SCT</span>
                                   </div>
+                                  <select
+                                    value={sync.status === 'convalidado' ? 'convalidado' : (sync.status === 'aprobado' ? 'aprobado' : 'pendiente')}
+                                    onChange={e=>{
+                                      const nextStatus = e.target.value as CurriculumSubject['status'];
+                                      setCurriculumManualStatus(item, nextStatus);
+                                    }}
+                                    style={{marginTop:8,width:'100%',padding:'6px 7px',borderRadius:8,border:`1px solid ${isValidated?'#34d39955':theme.cardBorder}`,background:darkMode?'#11131b':'#fff',color:theme.text,fontSize:9,fontWeight:800}}
+                                    title="Estado manual del ramo"
+                                  >
+                                    <option value="pendiente">Pendiente</option>
+                                    <option value="convalidado">Convalidado</option>
+                                    <option value="aprobado">Aprobado manualmente</option>
+                                  </select>
                                 </div>
                               );
                             })
@@ -3629,12 +3904,15 @@ export default function App() {
                       <div style={{ fontSize: '38px', fontWeight: '900', margin: '4px 0' }}>{formatCLP(selectedAccount.balance)}</div>
                       <span style={{ fontSize: '12px', color: theme.textMuted }}>Saldo disponible</span>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap:'wrap', justifyContent:'flex-end' }}>
                       <button onClick={() => { setTransType('ingreso'); setShowTransactionModal(true); }} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>
                         <ArrowUpRight size={16} /> + Abono
                       </button>
                       <button onClick={() => { setTransType('gasto'); setShowTransactionModal(true); }} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', backgroundColor: '#e11d48', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>
                         <ArrowDownRight size={16} /> - Cargo
+                      </button>
+                      <button onClick={() => clearAccountData(selectedAccount.id)} style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 12px', background:'transparent', color:theme.textMuted, border:`1px solid ${theme.cardBorder}`, borderRadius:'12px', fontWeight:800, fontSize:'12px', cursor:'pointer' }}>
+                        <Trash2 size={15}/> Limpiar
                       </button>
                     </div>
                   </div>
@@ -3680,9 +3958,22 @@ export default function App() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', marginBottom: '24px' }}>
                   {accountsList.map(acc => (
-                    <div key={acc.id} onClick={() => setSelectedAccountId(acc.id)} style={{ backgroundColor: theme.card, padding: '20px', borderRadius: '20px', border: `1px solid ${theme.cardBorder}`, cursor: 'pointer', borderLeft: `5px solid ${acc.color}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div key={acc.id} onClick={() => setSelectedAccountId(acc.id)} style={{ backgroundColor: theme.card, padding: '20px', borderRadius: '20px', border: `1px solid ${theme.cardBorder}`, cursor: 'pointer', borderLeft: `5px solid ${acc.color}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position:'relative' }}>
+                      <button
+                        type="button"
+                        title={`Limpiar ${acc.name}`}
+                        aria-label={`Limpiar ${acc.name}`}
+                        onClick={(e) => { e.stopPropagation(); clearAccountData(acc.id); }}
+                        style={{
+                          position:'absolute', top:12, right:12, width:28, height:28, borderRadius:9,
+                          border:`1px solid ${theme.cardBorder}`, background:'transparent', color:theme.textMuted,
+                          display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', opacity:.72
+                        }}
+                      >
+                        <Trash2 size={13}/>
+                      </button>
                       <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: theme.textMuted, fontSize: '11px', fontWeight: '800' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', paddingRight:34, color: theme.textMuted, fontSize: '11px', fontWeight: '800' }}>
                           <span>{acc.name.toUpperCase()}</span>
                           <CreditCard size={16} color={acc.color} />
                         </div>
@@ -3752,13 +4043,13 @@ export default function App() {
                     <div style={{fontSize:11,fontWeight:900}}>{habitsDone === habits.length && habits.length > 0 ? 'Día completo ✓' : `${Math.max(0, habits.length-habitsDone)} pendientes`}</div>
                   </div>
                   {habits.length === 0 ? <div style={{padding:'26px 10px',textAlign:'center',color:theme.textMuted,fontSize:12}}>Todavía no tienes hábitos. Crea el primero con “+ Hábito”.</div> : <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                    {habits.map(h=>{const done=isHabitDoneOn(h.id,todayStr); return <div key={h.id} onClick={()=>toggleHabitToday(h.id)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'12px 13px',borderRadius:12,border:`1px solid ${done?theme.text:theme.cardBorder}`,background:done?(darkMode?'#1c1d20':'#f2f2f2'):darkMode?'#111113':'#fafafa',color:theme.text,textAlign:'left',cursor:'pointer'}}>
-                      <div style={{width:29,height:29,borderRadius:9,border:`1px solid ${done?theme.text:theme.cardBorder}`,background:done?theme.text:'transparent',color:done?(darkMode?'#090909':'#fff'):theme.text,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,flexShrink:0}}>{done?'✓':h.icon}</div>
-                      <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{h.name}</div><div style={{fontSize:10,color:theme.textMuted}}>{h.category} · racha {habitStreak(h.id)} días</div></div>
+                    {habits.map(h=>{const target=habitDailyTarget(h.id); const count=habitOccurrenceCountOn(h.id,todayStr); const done=count>=target; return <div key={h.id} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'12px 13px',borderRadius:12,border:`1px solid ${done?theme.text:theme.cardBorder}`,background:done?(darkMode?'#1c1d20':'#f2f2f2'):darkMode?'#111113':'#fafafa',color:theme.text,textAlign:'left'}}>
+                      <button type='button' onClick={()=>toggleHabitToday(h.id)} style={{width:29,height:29,padding:0,borderRadius:9,border:`1px solid ${done?theme.text:theme.cardBorder}`,background:done?theme.text:'transparent',color:done?(darkMode?'#090909':'#fff'):theme.text,display:'flex',alignItems:'center',justifyContent:'center',fontSize:target>1?9:15,fontWeight:900,flexShrink:0,cursor:'pointer'}}>{target>1?`${count}/${target}`:(done?'✓':h.icon)}</button>
+                      <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{h.name}</div><div style={{fontSize:10,color:theme.textMuted}}>{h.category} · racha {habitStreak(h.id)} días{target>1?` · ${count}/${target} hoy`:''}</div>{target>1 && <div style={{display:'flex',gap:5,marginTop:7,flexWrap:'wrap'}}>{Array.from({length:target},(_,i)=>{const active=i<count; const label=target===2?(i===0?'Mañana':'Noche'):`${i+1}ª`; return <button type='button' key={i} onClick={(e)=>{e.stopPropagation();toggleHabitOccurrenceOnDate(h.id,todayStr,i+1);}} style={{padding:'5px 8px',borderRadius:999,border:`1px solid ${active?theme.text:theme.cardBorder}`,background:active?theme.text:'transparent',color:active?(darkMode?'#090909':'#fff'):theme.textMuted,fontSize:9,fontWeight:900,cursor:'pointer'}}>{active?'✓ ':''}{label}</button>})}</div>}</div>
                       <div style={{display:'flex',alignItems:'center',gap:5,flexShrink:0}}>
-                        {!isMobile && <div style={{fontSize:10,color:theme.textMuted,fontWeight:800,marginRight:2}}>{h.isBad?'Evitar hoy':(done?'Hecho':'Pendiente')}</div>}
-                        <button type='button' title='Editar hábito' onClick={(e)=>{e.stopPropagation();openEditHabitModal(h);}} style={{width:29,height:29,padding:0,borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:'transparent',color:theme.textMuted,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><Edit3 size={13}/></button>
-                        <button type='button' title='Eliminar hábito' onClick={(e)=>{e.stopPropagation();deleteHabit(h);}} style={{width:29,height:29,padding:0,borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:'transparent',color:theme.textMuted,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><Trash2 size={13}/></button>
+                        {!isMobile && <div style={{fontSize:10,color:theme.textMuted,fontWeight:800,marginRight:2}}>{h.isBad?'Evitar hoy':(done?'Hecho':target>1?`${count}/${target}`:'Pendiente')}</div>}
+                        <button type='button' title='Editar hábito' onClick={()=>openEditHabitModal(h)} style={{width:29,height:29,padding:0,borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:'transparent',color:theme.textMuted,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><Edit3 size={13}/></button>
+                        <button type='button' title='Eliminar hábito' onClick={()=>deleteHabit(h)} style={{width:29,height:29,padding:0,borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:'transparent',color:theme.textMuted,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><Trash2 size={13}/></button>
                       </div>
                     </div>})}
                   </div>}
@@ -3768,30 +4059,42 @@ export default function App() {
 
             {habitSubTab === 'semana' && (
               <div>
+                <div className="lifeos-animated-panel" style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:12,padding:'10px 12px',border:`1px solid ${theme.cardBorder}`,borderRadius:14,background:theme.card,flexWrap:'wrap'}}>
+                  <div>
+                    <div style={{fontSize:10,fontWeight:900,color:theme.textMuted}}>SEMANA MOSTRADA</div>
+                    <div style={{fontSize:13,fontWeight:900,marginTop:2}}>{habitWeekStart.toLocaleDateString('es-CL',{day:'2-digit',month:'short'})} — {habitWeekEnd.toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'})}</div>
+                    <div style={{fontSize:9,color:theme.textMuted,marginTop:2}}>Puedes marcar o corregir hábitos pasados y futuros.</div>
+                  </div>
+                  <div style={{display:'flex',gap:6}}>
+                    <button onClick={()=>setHabitWeekOffset(v=>v-1)} style={{width:34,height:34,borderRadius:9,border:`1px solid ${theme.cardBorder}`,background:'transparent',color:theme.text,cursor:'pointer'}}><ChevronLeft size={16}/></button>
+                    <button onClick={()=>setHabitWeekOffset(0)} style={{padding:'0 10px',height:34,borderRadius:9,border:`1px solid ${theme.cardBorder}`,background:habitWeekOffset===0?theme.text:'transparent',color:habitWeekOffset===0?(darkMode?'#090909':'#fff'):theme.text,fontSize:10,fontWeight:900,cursor:'pointer'}}>Hoy</button>
+                    <button onClick={()=>setHabitWeekOffset(v=>v+1)} style={{width:34,height:34,borderRadius:9,border:`1px solid ${theme.cardBorder}`,background:'transparent',color:theme.text,cursor:'pointer'}}><ChevronRight size={16}/></button>
+                  </div>
+                </div>
                 <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr 1fr':'repeat(3,1fr)',gap:8,marginBottom:12}}>
-                  <div style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:14,padding:14}}><div style={{fontSize:10,fontWeight:900,color:theme.textMuted}}>SEMANA</div><div style={{fontSize:24,fontWeight:900,marginTop:4}}>{weekRate}%</div><div style={{fontSize:10,color:theme.textMuted}}>cumplimiento</div></div>
-                  <div style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:14,padding:14}}><div style={{fontSize:10,fontWeight:900,color:theme.textMuted}}>REGISTROS</div><div style={{fontSize:24,fontWeight:900,marginTop:4}}>{totalHabitCompletionsThisWeek}</div><div style={{fontSize:10,color:theme.textMuted}}>de {weekPossible} posibles</div></div>
+                  <div style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:14,padding:14}}><div style={{fontSize:10,fontWeight:900,color:theme.textMuted}}>SEMANA</div><div style={{fontSize:24,fontWeight:900,marginTop:4}}>{displayedHabitWeekRate}%</div><div style={{fontSize:10,color:theme.textMuted}}>cumplimiento</div></div>
+                  <div style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:14,padding:14}}><div style={{fontSize:10,fontWeight:900,color:theme.textMuted}}>REGISTROS</div><div style={{fontSize:24,fontWeight:900,marginTop:4}}>{displayedHabitWeekCompletions}</div><div style={{fontSize:10,color:theme.textMuted}}>de {displayedHabitWeekPossible} posibles</div></div>
                   <div style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:14,padding:14,gridColumn:isMobile?'1 / -1':'auto'}}><div style={{fontSize:10,fontWeight:900,color:theme.textMuted}}>MEJOR RACHA</div><div style={{fontSize:24,fontWeight:900,marginTop:4}}>{habits.length?Math.max(...habits.map(h=>habitStreak(h.id))):0}</div><div style={{fontSize:10,color:theme.textMuted}}>días seguidos</div></div>
                 </div>
                 <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '16px', padding: isMobile ? '12px' : '16px', overflowX: 'auto' }}>
                   <div style={{ minWidth: isMobile ? '620px' : '0' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: `minmax(180px, 1.4fr) repeat(7, 1fr) 90px`, gap: 6, alignItems: 'center', fontSize: 10, color: theme.textMuted, fontWeight: 800, marginBottom: 8 }}>
                       <div>HÁBITO</div>
-                      {currentWeekDays.map((d, i) => <div key={i} style={{ textAlign:'center' }}>{d.toLocaleDateString('es-CL',{weekday:'short'}).replace('.','')}<br/>{d.getDate()}</div>)}
+                      {habitWeekDays.map((d, i) => <div key={i} style={{ textAlign:'center' }}>{d.toLocaleDateString('es-CL',{weekday:'short'}).replace('.','')}<br/>{d.getDate()}</div>)}
                       <div style={{ textAlign:'right' }}>RACHA</div>
                     </div>
                     {habits.map(h => (
                       <div key={h.id} style={{ display: 'grid', gridTemplateColumns: `minmax(180px, 1.4fr) repeat(7, 1fr) 90px`, gap: 6, alignItems: 'center', padding: '9px 0', borderTop: `1px solid ${theme.cardBorder}` }}>
                         <div><div style={{fontWeight:800,fontSize:12}}>{h.icon || '🎯'} {h.name}</div><div style={{fontSize:10,color:theme.textMuted}}>{h.category}</div></div>
-                        {currentWeekDays.map((d,i)=>{const ds=formatLocalDate(d); const done=isHabitDoneOn(h.id,ds); const isToday=ds===todayStr; return <button key={i} onClick={()=>isToday?toggleHabitToday(h.id):undefined} title={isToday?'Marcar/desmarcar hoy':'Historial'} style={{height:28,borderRadius:8,border:`1px solid ${done?theme.text:theme.cardBorder}`,background:done?theme.text:'transparent',color:done?(darkMode?'#090909':'#fff'):theme.textMuted,cursor:isToday?'pointer':'default',fontWeight:900}}>{done?'✓':'·'}</button>})}
+                        {habitWeekDays.map((d,i)=>{const ds=formatLocalDate(d); const target=habitDailyTarget(h.id); const count=habitOccurrenceCountOn(h.id,ds); const done=count>=target; const isToday=ds===todayStr; const isFuture=ds>todayStr; return <button key={i} onClick={()=>toggleHabitOnDate(h.id,ds)} title={`${done?'Reiniciar':'Sumar una marca'} · ${count}/${target} · ${d.toLocaleDateString('es-CL')}${isFuture?' · fecha futura':''}`} style={{height:28,borderRadius:8,border:`1px solid ${done?theme.text:(isToday?theme.text:theme.cardBorder)}`,background:done?theme.text:'transparent',color:done?(darkMode?'#090909':'#fff'):theme.textMuted,cursor:'pointer',fontWeight:900,boxShadow:isToday?`0 0 0 2px ${theme.text}18`:'none'}}>{target>1?`${count}/${target}`:(done?'✓':isToday?'○':'·')}</button>})}
                         <div style={{textAlign:'right',fontSize:11,fontWeight:900}}>{habitStreak(h.id)} días</div>
                       </div>
                     ))}
                   </div>
                 </div>
                 <div style={{marginTop:12,backgroundColor:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:16,padding:16}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><div><div style={{fontSize:13,fontWeight:900}}>Resumen semanal</div><div style={{fontSize:10,color:theme.textMuted}}>Lunes a domingo</div></div><div style={{fontSize:16,fontWeight:900}}>{weekRate}%</div></div>
-                  <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(2,1fr)',gap:8}}>{habits.map(h=>{const count=habitCountBetween(h.id,currentWeekStart,currentWeekEnd); const pct=Math.round(count/7*100); return <div key={h.id} style={{padding:11,border:`1px solid ${theme.cardBorder}`,borderRadius:12}}><div style={{fontSize:11,fontWeight:800}}>{h.icon} {h.name}</div><div style={{fontSize:20,fontWeight:900,marginTop:4}}>{count}/7</div><div style={{fontSize:10,color:theme.textMuted}}>días cumplidos</div><div style={{height:5,background:darkMode?'#2b2b2f':'#e5e7eb',borderRadius:9,marginTop:8}}><div style={{height:'100%',width:`${pct}%`,background:theme.text,borderRadius:9}} /></div></div>})}</div>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><div><div style={{fontSize:13,fontWeight:900}}>Resumen semanal</div><div style={{fontSize:10,color:theme.textMuted}}>{habitWeekStart.toLocaleDateString('es-CL',{day:'2-digit',month:'short'})} — {habitWeekEnd.toLocaleDateString('es-CL',{day:'2-digit',month:'short'})}</div></div><div style={{fontSize:16,fontWeight:900}}>{displayedHabitWeekRate}%</div></div>
+                  <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(2,1fr)',gap:8}}>{habits.map(h=>{const count=habitCountBetween(h.id,habitWeekStart,habitWeekEnd); const pct=Math.round(count/7*100); return <div key={h.id} style={{padding:11,border:`1px solid ${theme.cardBorder}`,borderRadius:12}}><div style={{fontSize:11,fontWeight:800}}>{h.icon} {h.name}</div><div style={{fontSize:20,fontWeight:900,marginTop:4}}>{count}/7</div><div style={{fontSize:10,color:theme.textMuted}}>días cumplidos</div><div style={{height:5,background:darkMode?'#2b2b2f':'#e5e7eb',borderRadius:9,marginTop:8}}><div style={{height:'100%',width:`${pct}%`,background:theme.text,borderRadius:9}} /></div></div>})}</div>
                 </div>
               </div>
             )}
@@ -3965,7 +4268,7 @@ export default function App() {
 
                           <div style={{ display: 'flex', justifyContent: 'center', gap: '4px', minHeight: '6px' }}>
                             {dayEvents.slice(0, 3).map((ev, i) => (
-                              <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: ev.type === 'acad' ? theme.text : ev.type === 'class' ? theme.textMuted : theme.cardBorder }} />
+                              <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: ev.type === 'acad' ? theme.text : theme.cardBorder }} />
                             ))}
                           </div>
                         </div>
@@ -4028,7 +4331,7 @@ export default function App() {
 
                         <div style={{ display: 'flex', gap: '3px' }}>
                           {dayEvents.slice(0, 3).map((ev, idx) => (
-                            <div key={idx} style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: ev.type === 'acad' ? theme.text : ev.type === 'class' ? theme.textMuted : theme.cardBorder }} />
+                            <div key={idx} style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: ev.type === 'acad' ? theme.text : theme.cardBorder }} />
                           ))}
                         </div>
 
@@ -4069,14 +4372,14 @@ export default function App() {
                         padding: '14px 16px',
                         borderRadius: '14px',
                         backgroundColor: darkMode ? '#0e1017' : '#f9fafb',
-                        borderLeft: `5px solid ${ev.type === 'acad' ? theme.text : ev.type === 'class' ? theme.textMuted : theme.cardBorder}`, 
+                        borderLeft: `5px solid ${ev.type === 'acad' ? theme.text : theme.cardBorder}`, 
                         border: `1px solid ${theme.cardBorder}`
                       }}>
                       <div>
                         <div style={{ fontWeight: '800', fontSize: '14px' }}>{ev.title}</div>
                         <div style={{ fontSize: '12px', color: theme.textMuted, marginTop: '2px' }}>{ev.subtitle}</div>
                       </div>
-                      <span style={{ padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold', backgroundColor: ev.type === 'acad' ? (darkMode ? '#242426' : '#eeeeef') : ev.type === 'class' ? (darkMode ? '#1f1f22' : '#f1f1f3') : (darkMode ? '#1f1f22' : '#f4f4f5'), color: theme.text }}>
+                      <span style={{ padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold', backgroundColor: ev.type === 'acad' ? (darkMode ? '#242426' : '#eeeeef') : (darkMode ? '#1f1f22' : '#f4f4f5'), color: theme.text }}>
                         {ev.type === 'acad' ? 'Académico' : 'Personal'}
                       </span>
                     </div>
@@ -4117,7 +4420,7 @@ export default function App() {
         )}
 
       {showBookmarkModal && (
-        <div style={{position:'fixed',inset:0,backgroundColor:'rgba(0,0,0,.8)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300,padding:16}}><div style={{backgroundColor:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:18,width:'100%',maxWidth:430,padding:20}}>
+        <div className="lifeos-modal-overlay" style={{position:'fixed',inset:0,backgroundColor:'rgba(0,0,0,.8)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300,padding:16}}><div style={{backgroundColor:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:18,width:'100%',maxWidth:430,padding:20}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><h2 style={{fontSize:17,fontWeight:900,margin:0}}>Nuevo enlace</h2><button onClick={()=>setShowBookmarkModal(false)} style={{background:'none',border:0,color:theme.textMuted}}><X size={18}/></button></div>
           <form onSubmit={e=>{e.preventDefault();if(!newBookmarkTitle.trim()||!newBookmarkUrl.trim())return;setBookmarks(prev=>[...prev,{id:Date.now(),title:newBookmarkTitle.trim(),url:newBookmarkUrl.trim(),category:newBookmarkCategory,icon:newBookmarkIcon,imageUrl:newBookmarkImageFile || newBookmarkImage || undefined}]);setNewBookmarkTitle('');setNewBookmarkUrl('');setNewBookmarkImage('');setNewBookmarkImageFile('');setShowBookmarkModal(false);}} style={{display:'flex',flexDirection:'column',gap:9}}>
             <input required placeholder='Nombre' value={newBookmarkTitle} onChange={e=>setNewBookmarkTitle(e.target.value)} style={{width:'100%',boxSizing:'border-box',padding:10,borderRadius:9,background:theme.card,border:`1px solid ${theme.cardBorder}`,color:theme.text}}/>
@@ -4169,7 +4472,7 @@ export default function App() {
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,flexWrap:'wrap'}}>
                 <div>
                   <h2 style={{fontSize:15,fontWeight:900,margin:0}}>✉️ Centro de avisos por correo</h2>
-                  <p style={{fontSize:11,color:theme.textMuted,margin:'4px 0 0',lineHeight:1.45}}>Funciona aunque LifeOS esté cerrado. El servidor de Supabase revisa tu horario y evaluaciones y envía los avisos configurados.</p>
+                  <p style={{fontSize:11,color:theme.textMuted,margin:'4px 0 0',lineHeight:1.45}}>Funciona aunque LifeOS esté cerrado. Supabase revisa tus avisos y también puede vigilar cambios oficiales de SES en fechas, horas y salas.</p>
                 </div>
                 <button onClick={()=>setEmailCenterEnabled(!emailCenterEnabled)} style={{padding:'8px 11px',borderRadius:9,border:`1px solid ${theme.cardBorder}`,background:emailCenterEnabled?theme.text:'transparent',color:emailCenterEnabled?(darkMode?'#090909':'#fff'):theme.text,fontWeight:900,fontSize:11}}>{emailCenterEnabled?'ACTIVO':'INACTIVO'}</button>
               </div>
@@ -4204,6 +4507,14 @@ export default function App() {
                     <button onClick={()=>setEmailEvaluationEnabled(!emailEvaluationEnabled)} style={{padding:'7px 9px',borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:emailEvaluationEnabled?theme.text:'transparent',color:emailEvaluationEnabled?(darkMode?'#090909':'#fff'):theme.text,fontWeight:900,fontSize:10}}>{emailEvaluationEnabled?'ON':'OFF'}</button>
                   </div>
                 </div>
+
+                <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr auto',gap:10,alignItems:'center',padding:'10px 0',borderTop:`1px solid ${theme.cardBorder}`}}>
+                  <div><div style={{fontSize:11,fontWeight:900}}>Cambios oficiales SES</div><div style={{fontSize:9,color:theme.textMuted,marginTop:2}}>LifeOS revisa periódicamente SES y te avisa por correo si cambia una fecha, hora o sala ya sincronizada.</div></div>
+                  <div style={{display:'flex',alignItems:'center',gap:7}}>
+                    <span style={{fontSize:9,color:theme.textMuted}}>cada ~30 min</span>
+                    <button onClick={()=>setEmailSesChangesEnabled(!emailSesChangesEnabled)} style={{padding:'7px 9px',borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:emailSesChangesEnabled?theme.text:'transparent',color:emailSesChangesEnabled?(darkMode?'#090909':'#fff'):theme.text,fontWeight:900,fontSize:10}}>{emailSesChangesEnabled?'ON':'OFF'}</button>
+                  </div>
+                </div>
               </div>
 
               <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:12}}>
@@ -4223,10 +4534,10 @@ export default function App() {
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,flexWrap:'wrap'}}>
                 <div>
                   <h2 style={{fontSize:15,fontWeight:900,margin:0}}>🎓 Sincronización SES UChile</h2>
-                  <p style={{fontSize:11,color:theme.textMuted,margin:'4px 0 0',lineHeight:1.45}}>Prueba el calendario público oficial antes de 2027. LifeOS sólo muestra coincidencias con tus ramos activos y no importa nada hasta que tú lo autorices.</p>
+                  <p style={{fontSize:11,color:theme.textMuted,margin:'4px 0 0',lineHeight:1.45}}>Conecta LifeOS con el período oficial que corresponde a tu semestre. Desde 2027 se usa el período automático y sólo se importan coincidencias con tus ramos activos.</p>
                 </div>
                 <div style={{fontSize:10,fontWeight:900,padding:'5px 8px',borderRadius:999,border:`1px solid ${theme.cardBorder}`,color:sesStatus==='ok'?'#22c55e':sesStatus==='error'?'#ef4444':theme.textMuted}}>
-                  {sesStatus==='loading' ? 'CONSULTANDO…' : sesStatus==='ok' ? '● CONECTADO' : sesStatus==='error' ? 'ERROR' : 'MODO PRUEBA'}
+                  {sesStatus==='loading' ? 'CONSULTANDO…' : sesStatus==='ok' ? '● CONECTADO' : sesStatus==='error' ? 'ERROR' : (sesUseAutomaticPeriod?'LISTO 2027':'MANUAL')}
                 </div>
               </div>
 
@@ -4237,17 +4548,17 @@ export default function App() {
                     value={sesUseAutomaticPeriod ? sesPeriodForSemester(currentSemesterNumber) : sesTestPeriod}
                     disabled={sesUseAutomaticPeriod}
                     onChange={e=>setSesTestPeriod(e.target.value)}
-                    placeholder="2026-2"
+                    placeholder="2027-1"
                     style={{width:'100%',boxSizing:'border-box',padding:9,borderRadius:8,background:theme.card,border:`1px solid ${theme.cardBorder}`,color:theme.text,fontWeight:800}}
                   />
-                  <div style={{fontSize:9,color:theme.textMuted,marginTop:6}}>Para probar ahora usa <strong style={{color:theme.text}}>2026-2</strong>. Tu semestre 1 real corresponde automáticamente a <strong style={{color:theme.text}}>2027-1</strong>.</div>
+                  <div style={{fontSize:9,color:theme.textMuted,marginTop:6}}>El Semestre 1 real corresponde a <strong style={{color:theme.text}}>2027-1</strong>. El modo automático cambia solo a 2027-2, 2028-1, etc., según avances.</div>
                 </div>
                 <div style={{padding:11,borderRadius:10,border:`1px solid ${theme.cardBorder}`,background:darkMode?'#0e1017':'#f8f8f9'}}>
                   <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'center'}}>
                     <div><div style={{fontSize:10,fontWeight:900}}>Período automático</div><div style={{fontSize:9,color:theme.textMuted,marginTop:3}}>Usa tu semestre actual de LifeOS.</div></div>
-                    <button onClick={()=>{setSesUseAutomaticPeriod(!sesUseAutomaticPeriod);setSesEvaluations([]);setSesStatus('idle');setSesMessage('');}} style={{padding:'7px 10px',borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:sesUseAutomaticPeriod?theme.text:'transparent',color:sesUseAutomaticPeriod?(darkMode?'#090909':'#fff'):theme.text,fontWeight:900,fontSize:10}}>{sesUseAutomaticPeriod?'ACTIVO':'PRUEBA'}</button>
+                    <button onClick={()=>{setSesUseAutomaticPeriod(!sesUseAutomaticPeriod);setSesEvaluations([]);setSesStatus('idle');setSesMessage('');}} style={{padding:'7px 10px',borderRadius:8,border:`1px solid ${theme.cardBorder}`,background:sesUseAutomaticPeriod?theme.text:'transparent',color:sesUseAutomaticPeriod?(darkMode?'#090909':'#fff'):theme.text,fontWeight:900,fontSize:10}}>{sesUseAutomaticPeriod?'AUTOMÁTICO':'MANUAL'}</button>
                   </div>
-                  <div style={{fontSize:9,color:theme.textMuted,marginTop:8}}>Semestre {currentSemesterNumber} → <strong style={{color:theme.text}}>{sesPeriodForSemester(currentSemesterNumber)}</strong>. Déjalo en PRUEBA hasta que quieras usar datos 2027.</div>
+                  <div style={{fontSize:9,color:theme.textMuted,marginTop:8}}>Semestre {currentSemesterNumber} → <strong style={{color:theme.text}}>{sesPeriodForSemester(currentSemesterNumber)}</strong>. Recomendado: mantener AUTOMÁTICO.</div>
                 </div>
               </div>
 
@@ -4408,7 +4719,7 @@ export default function App() {
 
       {/* MODAL: EVALUACIÓN ACADÉMICA (HORARIO DE CLASES VS EXTRACURRICULAR) */}
       {showAcademicTaskModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, backdropFilter: 'blur(4px)', padding: '14px' }}>
+        <div className="lifeos-modal-overlay" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, backdropFilter: 'blur(4px)', padding: '14px' }}>
           <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', width: '100%', maxWidth: '440px', padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0 }}>Agendar Evaluación</h2>
@@ -4578,7 +4889,7 @@ export default function App() {
 
       {/* MODAL: TO-DO */}
       {showTodoModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, backdropFilter: 'blur(4px)', padding: '16px' }}>
+        <div className="lifeos-modal-overlay" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, backdropFilter: 'blur(4px)', padding: '16px' }}>
           <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', width: '100%', maxWidth: '420px', padding: '24px' }}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}><h2 style={{fontSize:18,fontWeight:900,margin:0}}>Nuevo Pendiente To-Do</h2><button type='button' onClick={()=>setShowTodoModal(false)} style={{background:'none',border:0,color:theme.textMuted,cursor:'pointer'}}><X size={18}/></button></div>
             <form onSubmit={(e) => {
@@ -4628,9 +4939,10 @@ export default function App() {
         <div style={{ position:'fixed', inset:0, backgroundColor:'rgba(0,0,0,.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:300, padding:16 }}>
           <div style={{ backgroundColor:theme.card, border:`1px solid ${theme.cardBorder}`, borderRadius:20, width:'100%', maxWidth:500, maxHeight:'92vh', overflowY:'auto', padding:20 }}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div><h2 style={{fontSize:17,fontWeight:900,margin:0}}>{editingHabitId !== null ? 'Editar Hábito' : 'Nuevo Hábito'}</h2><div style={{fontSize:10,color:theme.textMuted,marginTop:3}}>{editingHabitId !== null ? 'Los cambios conservan tu historial y tu racha.' : 'Configúralo para que LifeOS sepa cómo medirlo.'}</div></div><button type='button' onClick={()=>{setShowHabitModal(false);resetHabitForm();}} style={{background:'none',border:0,color:theme.textMuted,cursor:'pointer'}}><X size={19}/></button></div>
-            <form onSubmit={(e)=>{e.preventDefault();if(!newHabitName.trim())return;const habitData={name:newHabitName.trim(),category:newHabitCat,icon:newHabitIcon,frequency:newHabitFrequency,weeklyTarget:newHabitFrequency==='weekly'?Math.min(7,Math.max(1,Number(newHabitWeeklyTarget)||1)):7,isBad:newHabitIsBad,hasEndDate:newHabitHasEndDate,endDate:newHabitHasEndDate?newHabitEndDate:''};if(editingHabitId!==null){setHabits(prev=>prev.map(h=>h.id===editingHabitId?{...h,...habitData}:h));}else{setHabits(prev=>[...prev,{id:Date.now(),...habitData,streak:0,completed:false}]);}setShowHabitModal(false);resetHabitForm();setHabitSubTab('dia');}} style={{display:'flex',flexDirection:'column',gap:11}}>
+            <form onSubmit={(e)=>{e.preventDefault();if(!newHabitName.trim())return;const habitData={name:newHabitName.trim(),category:newHabitCat,icon:newHabitIcon,frequency:newHabitFrequency,weeklyTarget:newHabitFrequency==='weekly'?Math.min(7,Math.max(1,Number(newHabitWeeklyTarget)||1)):7,dailyTarget:newHabitFrequency==='daily'?Math.min(6,Math.max(1,Number(newHabitDailyTarget)||1)):1,isBad:newHabitIsBad,hasEndDate:newHabitHasEndDate,endDate:newHabitHasEndDate?newHabitEndDate:''};if(editingHabitId!==null){setHabits(prev=>prev.map(h=>h.id===editingHabitId?{...h,...habitData}:h));}else{setHabits(prev=>[...prev,{id:Date.now(),...habitData,streak:0,completed:false}]);}setShowHabitModal(false);resetHabitForm();setHabitSubTab('dia');}} style={{display:'flex',flexDirection:'column',gap:11}}>
               <input type='text' placeholder='Ej. Entrenar 45 min' required value={newHabitName} onChange={e=>setNewHabitName(e.target.value)} style={{width:'100%',boxSizing:'border-box',padding:10,borderRadius:9,background:theme.card,border:`1px solid ${theme.cardBorder}`,color:theme.text}}/>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}><input type='text' placeholder='Categoría' value={newHabitCat} onChange={e=>setNewHabitCat(e.target.value)} style={{width:'100%',boxSizing:'border-box',padding:10,borderRadius:9,background:theme.card,border:`1px solid ${theme.cardBorder}`,color:theme.text}}/><div><div style={{fontSize:10,color:theme.textMuted,fontWeight:900,marginBottom:5}}>FRECUENCIA</div><select value={newHabitFrequency} onChange={e=>setNewHabitFrequency(e.target.value as any)} style={{width:'100%',padding:10,borderRadius:9,background:theme.card,border:`1px solid ${theme.cardBorder}`,color:theme.text}}><option value='daily'>Todos los días</option><option value='weekly'>Semanal</option></select></div></div>
+              {newHabitFrequency==='daily' && <div><label style={{fontSize:10,color:theme.textMuted,fontWeight:900}}>VECES POR DÍA</label><div style={{display:'flex',gap:6,marginTop:6,flexWrap:'wrap'}}>{[1,2,3,4,5,6].map(n=><button type='button' key={n} onClick={()=>setNewHabitDailyTarget(String(n))} style={{width:38,height:34,borderRadius:9,border:`1px solid ${newHabitDailyTarget===String(n)?theme.text:theme.cardBorder}`,background:newHabitDailyTarget===String(n)?theme.text:'transparent',color:newHabitDailyTarget===String(n)?(darkMode?'#090909':'#fff'):theme.text,fontWeight:900,cursor:'pointer'}}>{n}</button>)}</div><div style={{fontSize:9,color:theme.textMuted,marginTop:4}}>Ej.: skincare mañana y noche = 2 veces al día. Cada marca se registra dentro del mismo hábito.</div></div>}
               {newHabitFrequency==='weekly' && <div><label style={{fontSize:10,color:theme.textMuted,fontWeight:900}}>OBJETIVO SEMANAL</label><input type='number' min='1' max='7' value={newHabitWeeklyTarget} onChange={e=>setNewHabitWeeklyTarget(e.target.value)} style={{display:'block',width:100,marginTop:4,padding:9,borderRadius:9,background:theme.card,border:`1px solid ${theme.cardBorder}`,color:theme.text}}/><div style={{fontSize:9,color:theme.textMuted,marginTop:3}}>Cuántas veces quieres cumplirlo por semana.</div></div>}
               <div><div style={{fontSize:10,color:theme.textMuted,fontWeight:900,marginBottom:5}}>EMOJI</div><div style={{display:'grid',gridTemplateColumns:'repeat(10,1fr)',gap:5}}>{HABIT_ICONS.concat(['🧠','🚰','🛌','🍎','🚭','📵','🧹','💊','🧴','🎮','💰','☀️','🌿','🧼','🚶','🏠']).map(em=><button type='button' key={em} onClick={()=>setNewHabitIcon(em)} style={{padding:6,borderRadius:8,border:`1px solid ${newHabitIcon===em?theme.text:theme.cardBorder}`,background:newHabitIcon===em?theme.text:'transparent',color:newHabitIcon===em?(darkMode?'#090909':'#fff'):theme.text,fontSize:16,cursor:'pointer'}}>{em}</button>)}</div></div>
               <label style={{display:'flex',alignItems:'center',gap:8,fontSize:11,fontWeight:800}}><input type='checkbox' checked={newHabitIsBad} onChange={e=>setNewHabitIsBad(e.target.checked)} /> Es un hábito que quiero dejar / evitar</label>
@@ -4644,7 +4956,7 @@ export default function App() {
 
       {/* MODAL: CONFIGURAR RAMO */}
       {showSubjectModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, backdropFilter: 'blur(4px)', padding: isMobile ? '10px' : '20px' }}>
+        <div className="lifeos-modal-overlay" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, backdropFilter: 'blur(4px)', padding: isMobile ? '10px' : '20px' }}>
           <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', width: '100%', maxWidth: '580px', maxHeight: '92vh', overflowY: 'auto', padding: isMobile ? '18px' : '26px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}>{editingSubjectId !== null ? 'Editar Ramo' : 'Configurar Ramo'}</h2>
@@ -4802,7 +5114,7 @@ export default function App() {
 
       {/* MODAL: RECESO O PARO */}
       {showBreakModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, backdropFilter: 'blur(4px)', padding: '16px' }}>
+        <div className="lifeos-modal-overlay" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, backdropFilter: 'blur(4px)', padding: '16px' }}>
           <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', width: '100%', maxWidth: '400px', padding: '22px' }}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}><h2 style={{fontSize:17,fontWeight:900,margin:0}}>Añadir Receso o Paro</h2><button type='button' onClick={()=>setShowBreakModal(false)} style={{background:'none',border:0,color:theme.textMuted}}><X size={18}/></button></div>
             <form onSubmit={(e) => {
@@ -4829,7 +5141,7 @@ export default function App() {
 
       {/* MODAL: NUEVA CUENTA */}
       {showNewAccountModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, backdropFilter: 'blur(4px)', padding: '16px' }}>
+        <div className="lifeos-modal-overlay" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, backdropFilter: 'blur(4px)', padding: '16px' }}>
           <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', width: '100%', maxWidth: '400px', padding: '22px' }}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}><h2 style={{fontSize:17,fontWeight:900,margin:0}}>Nueva Cuenta</h2><button type='button' onClick={()=>setShowNewAccountModal(false)} style={{background:'none',border:0,color:theme.textMuted}}><X size={18}/></button></div>
             <form onSubmit={(e) => {
@@ -4858,7 +5170,7 @@ export default function App() {
 
       {/* MODAL: MOVIMIENTO FINANCIERO */}
       {showTransactionModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, backdropFilter: 'blur(4px)', padding: '16px' }}>
+        <div className="lifeos-modal-overlay" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, backdropFilter: 'blur(4px)', padding: '16px' }}>
           <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', width: '100%', maxWidth: '400px', padding: '22px' }}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}><h2 style={{fontSize:17,fontWeight:900,margin:0}}>{transType === 'ingreso' ? 'Abono (+)' : 'Cargo (-)'}</h2><button type='button' onClick={()=>setShowTransactionModal(false)} style={{background:'none',border:0,color:theme.textMuted}}><X size={18}/></button></div>
             <form onSubmit={(e) => {
@@ -4896,7 +5208,7 @@ export default function App() {
 
       {/* MODAL: LISTA DE COMPRAS */}
       {showShoppingModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,.76)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:300, padding:16 }}>
+        <div className="lifeos-modal-overlay" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,.76)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:300, padding:16 }}>
           <div style={{backgroundColor:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:18,width:'100%',maxWidth:400,padding:20}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><h2 style={{fontSize:17,fontWeight:900,margin:0}}>Añadir a compras</h2><button onClick={()=>setShowShoppingModal(false)} style={{background:'none',border:0,color:theme.textMuted}}><X size={18}/></button></div>
             <form onSubmit={e=>{e.preventDefault();if(!newShoppingTitle.trim())return;setShoppingItems([...shoppingItems,{id:Date.now(),title:newShoppingTitle.trim(),category:newShoppingCategory,emoji:newShoppingEmoji,completed:false}]);setNewShoppingTitle('');setShowShoppingModal(false);}}>
@@ -4910,7 +5222,7 @@ export default function App() {
 
       {/* MODAL: META DE AHORRO */}
       {showGoalModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, backdropFilter: 'blur(4px)', padding: '16px' }}>
+        <div className="lifeos-modal-overlay" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, backdropFilter: 'blur(4px)', padding: '16px' }}>
           <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', width: '100%', maxWidth: '420px', padding: '22px' }}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><h2 style={{fontSize:17,fontWeight:900,margin:0}}>Nuevo Objetivo de Compra</h2><button type='button' onClick={()=>setShowGoalModal(false)} style={{background:'none',border:0,color:theme.textMuted}}><X size={18}/></button></div>
             <form onSubmit={(e) => {
