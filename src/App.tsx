@@ -47,6 +47,7 @@ type LifeOSTab = 'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'cal
 type AssistantEntryType = 'Ramo' | 'Proyecto' | 'Idea' | 'Fórmula' | 'Reunión' | 'Tarea' | 'Ponderación';
 type AssistantEntry = { id: number; type: AssistantEntryType; title: string; course: string; content: string; date: string; weight: string; done: boolean };
 type ChessSession = { id: number; date: string; minutes: number; focus: string; notes: string };
+type ChessOpeningNote = { id: number; name: string; color: string; moves: string; notes: string; done: boolean };
 
 const LIFEOS_CAREER_SEED_VERSION = 'qyf_uchile_2027_v10';
 
@@ -851,6 +852,196 @@ const LIFEOS_V9_CSS = `
     .lifeos-music-frame { height:80px; }
   }
 `;
+
+
+
+type AssistantCourseSection = 'Recursos a presentar' | 'Recursos a crear' | 'Ponderaciones' | 'Próximas evaluaciones' | 'Reuniones' | 'Clases a impartir' | 'Apuntes';
+type AssistantCourseItem = { id: number; section: AssistantCourseSection; title: string; detail: string; date: string; weight: string; done: boolean };
+type AssistantCourse = { id: number; name: string; code: string; description: string; items: AssistantCourseItem[] };
+type ChessOpeningNote = { id: number; name: string; color: string; moves: string; notes: string; done: boolean };
+
+const ASSISTANT_SECTIONS: AssistantCourseSection[] = ['Recursos a presentar','Recursos a crear','Ponderaciones','Próximas evaluaciones','Reuniones','Clases a impartir','Apuntes'];
+
+function AssistantWorkspace({ theme, isMobile }: { theme: any; isMobile: boolean }) {
+  const [courses, setCourses] = useState<AssistantCourse[]>(() => {
+    try {
+      const saved = localStorage.getItem('lifeos_assistant_courses');
+      if (saved) return JSON.parse(saved);
+      const legacy = JSON.parse(localStorage.getItem('lifeos_assistant_entries') || '[]');
+      return (Array.isArray(legacy) ? legacy : []).filter((x: any) => x.type === 'Ramo').map((x: any) => ({
+        id: x.id, name: x.title || 'Ramo sin nombre', code: '', description: x.content || '',
+        items: []
+      }));
+    } catch { return []; }
+  });
+  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  const [section, setSection] = useState<AssistantCourseSection>('Recursos a presentar');
+  const [courseName, setCourseName] = useState('');
+  const [courseCode, setCourseCode] = useState('');
+  const [courseDescription, setCourseDescription] = useState('');
+  const [itemTitle, setItemTitle] = useState('');
+  const [itemDetail, setItemDetail] = useState('');
+  const [itemDate, setItemDate] = useState('');
+  const [itemWeight, setItemWeight] = useState('');
+  const [showCourseForm, setShowCourseForm] = useState(false);
+
+  useEffect(() => { localStorage.setItem('lifeos_assistant_courses', JSON.stringify(courses)); }, [courses]);
+  const selectedCourse = courses.find(c => c.id === selectedCourseId) || null;
+  const sectionItems = selectedCourse?.items.filter(item => item.section === section) || [];
+  const panel = { background: theme.card, border: '1px solid ' + theme.cardBorder, borderRadius: 17, padding: 17 };
+  const field = { width: '100%', boxSizing: 'border-box' as const, padding: 11, borderRadius: 10, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, font: 'inherit' };
+
+  const createCourse = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!courseName.trim()) return;
+    const next: AssistantCourse = { id: Date.now(), name: courseName.trim(), code: courseCode.trim(), description: courseDescription.trim(), items: [] };
+    setCourses(prev => [next, ...prev]);
+    setSelectedCourseId(next.id);
+    setCourseName(''); setCourseCode(''); setCourseDescription(''); setShowCourseForm(false);
+  };
+  const addItem = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedCourse || !itemTitle.trim()) return;
+    const item: AssistantCourseItem = { id: Date.now(), section, title: itemTitle.trim(), detail: itemDetail.trim(), date: itemDate, weight: itemWeight.trim(), done: false };
+    setCourses(prev => prev.map(course => course.id === selectedCourse.id ? { ...course, items: [item, ...course.items] } : course));
+    setItemTitle(''); setItemDetail(''); setItemDate(''); setItemWeight('');
+  };
+  const updateItem = (itemId: number, changes: Partial<AssistantCourseItem>) => {
+    if (!selectedCourse) return;
+    setCourses(prev => prev.map(course => course.id === selectedCourse.id ? { ...course, items: course.items.map(item => item.id === itemId ? { ...item, ...changes } : item) } : course));
+  };
+  const deleteCourse = (id: number) => {
+    if (!window.confirm('¿Eliminar este ramo y todos sus registros de ayudantía?')) return;
+    setCourses(prev => prev.filter(course => course.id !== id));
+    if (selectedCourseId === id) setSelectedCourseId(null);
+  };
+
+  return <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
+      <div><div className="lifeos-overline">CENTRO DE AYUDANTÍAS · ESPACIO INDEPENDIENTE</div><h1 style={{ fontSize: isMobile ? 25 : 32, fontWeight: 900, margin: '5px 0' }}>Ayudante</h1><p style={{ fontSize: 13, color: theme.textMuted, margin: 0 }}>Administra tus ayudantías sin mezclarlas con tus ramos ni notas personales.</p></div>
+      {selectedCourse && <button onClick={() => setSelectedCourseId(null)} style={{ padding: '9px 13px', borderRadius: 10, border: '1px solid ' + theme.cardBorder, background: theme.card, color: theme.text, fontWeight: 800, cursor: 'pointer' }}>← Todos los ramos</button>}
+    </div>
+    {!selectedCourse ? <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div><h2 style={{ margin: 0, fontSize: 18 }}>Mis ramos de ayudantía</h2><p style={{ margin: '4px 0 0', fontSize: 12, color: theme.textMuted }}>{courses.length} {courses.length === 1 ? 'ramo registrado' : 'ramos registrados'}</p></div>
+        <button onClick={() => setShowCourseForm(v => !v)} style={{ padding: '10px 14px', border: 0, borderRadius: 11, background: theme.text, color: theme.bg, fontWeight: 900, cursor: 'pointer' }}><Plus size={15} style={{ display: 'inline', verticalAlign: '-3px' }}/> Nuevo ramo</button>
+      </div>
+      {showCourseForm && <form onSubmit={createCourse} style={{ ...panel, display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 180px', gap: 10, marginBottom: 14 }}>
+        <input required value={courseName} onChange={e => setCourseName(e.target.value)} placeholder="Nombre del ramo" style={field}/>
+        <input value={courseCode} onChange={e => setCourseCode(e.target.value)} placeholder="Código / sección" style={field}/>
+        <textarea value={courseDescription} onChange={e => setCourseDescription(e.target.value)} placeholder="Descripción, docente, horario u otros datos (opcional)" rows={2} style={{ ...field, gridColumn: isMobile ? 'auto' : '1 / -1', resize: 'vertical' }}/>
+        <button type="submit" style={{ padding: 11, border: 0, borderRadius: 10, background: theme.text, color: theme.bg, fontWeight: 900, cursor: 'pointer', gridColumn: isMobile ? 'auto' : '1 / -1' }}>Crear espacio del ramo</button>
+      </form>}
+      {courses.length === 0 ? <div style={{ ...panel, textAlign: 'center', padding: 34, color: theme.textMuted }}><GraduationCap size={28}/><h3 style={{ color: theme.text, margin: '9px 0 4px' }}>Todavía no tienes ramos de ayudantía</h3><p style={{ fontSize: 12, margin: 0 }}>Crea un ramo para organizar materiales, evaluaciones, ponderaciones y clases.</p></div> :
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,minmax(0,1fr))', gap: 12 }}>
+          {courses.map(course => <article key={course.id} style={{ ...panel, textAlign: 'left' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><div><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>{course.code || 'AYUDANTÍA'}</div><h3 style={{ fontSize: 17, margin: '5px 0' }}>{course.name}</h3></div><button onClick={() => deleteCourse(course.id)} title="Eliminar ramo" style={{ border: 0, background: 'transparent', color: theme.textMuted, cursor: 'pointer' }}><Trash2 size={16}/></button></div>
+            {course.description && <p style={{ fontSize: 12, color: theme.textMuted, lineHeight: 1.5 }}>{course.description}</p>}
+            <div style={{ fontSize: 11, color: theme.textMuted, margin: '12px 0' }}>{course.items.length} registros · {course.items.filter(x => !x.done).length} pendientes</div>
+            <button onClick={() => { setSelectedCourseId(course.id); setSection('Recursos a presentar'); }} style={{ width: '100%', padding: 10, border: '1px solid ' + theme.cardBorder, borderRadius: 10, background: theme.bg, color: theme.text, fontWeight: 900, cursor: 'pointer' }}>Abrir ramo <span aria-hidden="true">→</span></button>
+          </article>)}
+        </div>}
+    </> : <>
+      <div style={{ ...panel, marginBottom: 14 }}>
+        <div className="lifeos-overline">{selectedCourse.code || 'ESPACIO DE AYUDANTÍA'}</div><h2 style={{ fontSize: 22, margin: '5px 0' }}>{selectedCourse.name}</h2>{selectedCourse.description && <p style={{ color: theme.textMuted, fontSize: 12, margin: 0 }}>{selectedCourse.description}</p>}
+      </div>
+      <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 9, marginBottom: 12 }}>
+        {ASSISTANT_SECTIONS.map(name => <button key={name} onClick={() => setSection(name)} style={{ whiteSpace: 'nowrap', padding: '9px 11px', borderRadius: 10, border: '1px solid ' + theme.cardBorder, background: section === name ? theme.text : theme.card, color: section === name ? theme.bg : theme.text, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{name}</button>)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(260px,.8fr) minmax(0,1.3fr)', gap: 13, alignItems: 'start' }}>
+        <form onSubmit={addItem} style={{ ...panel, display: 'flex', flexDirection: 'column', gap: 9 }}>
+          <h3 style={{ margin: 0, fontSize: 15 }}>Agregar · {section}</h3>
+          <input required value={itemTitle} onChange={e => setItemTitle(e.target.value)} placeholder={section === 'Ponderaciones' ? 'Ej. Certamen 1' : 'Título o nombre'} style={field}/>
+          <textarea value={itemDetail} onChange={e => setItemDetail(e.target.value)} rows={4} placeholder="Descripción, instrucciones, enlace o apuntes…" style={{ ...field, resize: 'vertical' }}/>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <input type="date" value={itemDate} onChange={e => setItemDate(e.target.value)} style={field}/>
+            <input value={itemWeight} onChange={e => setItemWeight(e.target.value)} placeholder="Ponderación %" style={field}/>
+          </div>
+          <button type="submit" style={{ padding: 11, border: 0, borderRadius: 10, background: theme.text, color: theme.bg, fontWeight: 900, cursor: 'pointer' }}>Guardar registro</button>
+        </form>
+        <section style={{ ...panel, minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', marginBottom: 10 }}><h3 style={{ fontSize: 15, margin: 0 }}>{section}</h3><span style={{ fontSize: 11, color: theme.textMuted }}>{sectionItems.length} registros</span></div>
+          {sectionItems.length === 0 ? <div style={{ padding: 25, textAlign: 'center', color: theme.textMuted, fontSize: 12 }}>Aún no hay registros en este apartado.</div> :
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{sectionItems.map(item => <article key={item.id} style={{ padding: 12, borderRadius: 12, border: '1px solid ' + theme.cardBorder, background: theme.bg, opacity: item.done ? .62 : 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}><div style={{ minWidth: 0 }}><div style={{ fontWeight: 900, fontSize: 13, textDecoration: item.done ? 'line-through' : 'none' }}>{item.title}</div>{item.detail && <p style={{ whiteSpace: 'pre-wrap', fontSize: 12, color: theme.textMuted, lineHeight: 1.5, margin: '6px 0' }}>{item.detail}</p>}<div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 10, color: theme.textMuted }}>{item.date && <span>📅 {item.date}</span>}{item.weight && <span>⚖ {item.weight.includes('%') ? item.weight : item.weight + '%'}</span>}</div></div><button onClick={() => updateItem(item.id, { done: !item.done })} title={item.done ? 'Reabrir' : 'Marcar como listo'} style={{ border: '1px solid ' + theme.cardBorder, background: item.done ? theme.card : 'transparent', color: theme.text, borderRadius: 8, padding: 6, cursor: 'pointer' }}>{item.done ? <CheckCircle2 size={16}/> : <CheckCircle2 size={16} opacity={.45}/>}</button></div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 5 }}><button onClick={() => setCourses(prev => prev.map(c => c.id === selectedCourse.id ? { ...c, items: c.items.filter(x => x.id !== item.id) } : c))} style={{ border: 0, background: 'transparent', color: theme.textMuted, fontSize: 10, cursor: 'pointer' }}>Eliminar</button></div>
+            </article>)}</div>}
+        </section>
+      </div>
+    </>}
+  </div>;
+}
+
+const CHESS_PIECES: Record<string, string> = { 'K':'♔','Q':'♕','R':'♖','B':'♗','N':'♘','P':'♙','k':'♚','q':'♛','r':'♜','b':'♝','n':'♞','p':'♟' };
+const START_CHESS_BOARD = 'rnbqkbnrpppppppp................................PPPPPPPPRNBQKBNR'.split('');
+
+function ChessWorkspace(props: {
+  theme: any; isMobile: boolean; chessSessions: ChessSession[]; setChessSessions: React.Dispatch<React.SetStateAction<ChessSession[]>>;
+  chessGoal: string; setChessGoal: (value: string) => void; chessRating: string; setChessRating: (value: string) => void;
+  chessMinutes: string; setChessMinutes: (value: string) => void; chessFocus: string; setChessFocus: (value: string) => void;
+  chessNotes: string; setChessNotes: (value: string) => void;
+}) {
+  const { theme, isMobile, chessSessions, setChessSessions, chessGoal, setChessGoal, chessRating, setChessRating, chessMinutes, setChessMinutes, chessFocus, setChessFocus, chessNotes, setChessNotes } = props;
+  const [tab, setTab] = useState<'Entrenamiento'|'Videos'|'Tablero libre'|'Aperturas'>('Entrenamiento');
+  const [board, setBoard] = useState<string[]>(() => [...START_CHESS_BOARD]);
+  const [selectedSquare, setSelectedSquare] = useState<number | null>(null);
+  const [openings, setOpenings] = useState<ChessOpeningNote[]>(() => { try { return JSON.parse(localStorage.getItem('lifeos_chess_openings') || '[]'); } catch { return []; } });
+  const [openingName, setOpeningName] = useState('');
+  const [openingColor, setOpeningColor] = useState('Blancas');
+  const [openingMoves, setOpeningMoves] = useState('');
+  const [openingNotes, setOpeningNotes] = useState('');
+  useEffect(() => { localStorage.setItem('lifeos_chess_openings', JSON.stringify(openings)); }, [openings]);
+  const panel = { background: theme.card, border: '1px solid ' + theme.cardBorder, borderRadius: 17, padding: 16 };
+  const field = { width: '100%', boxSizing: 'border-box' as const, padding: 10, borderRadius: 10, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, font: 'inherit' };
+  const movePiece = (index: number) => {
+    if (selectedSquare === null) {
+      if (board[index] !== '.') setSelectedSquare(index);
+      return;
+    }
+    if (selectedSquare === index) { setSelectedSquare(null); return; }
+    setBoard(prev => { const next = [...prev]; next[index] = next[selectedSquare]; next[selectedSquare] = '.'; return next; });
+    setSelectedSquare(null);
+  };
+  const addOpening = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!openingName.trim()) return;
+    setOpenings(prev => [{ id: Date.now(), name: openingName.trim(), color: openingColor, moves: openingMoves.trim(), notes: openingNotes.trim(), done: false }, ...prev]);
+    setOpeningName(''); setOpeningMoves(''); setOpeningNotes('');
+  };
+  const tabButton = (name: typeof tab) => <button key={name} onClick={() => setTab(name)} style={{ whiteSpace: 'nowrap', padding: '10px 14px', borderRadius: 10, border: '1px solid ' + theme.cardBorder, background: tab === name ? theme.text : theme.card, color: tab === name ? theme.bg : theme.text, fontWeight: 900, fontSize: 12, cursor: 'pointer' }}>{name}</button>;
+
+  return <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ marginBottom: 18 }}><div className="lifeos-overline">ENTRENAMIENTO PERSONAL</div><h1 style={{ fontSize: isMobile ? 25 : 32, fontWeight: 900, margin: '5px 0' }}>Ajedrez ♟</h1><p style={{ fontSize: 13, color: theme.textMuted, margin: 0 }}>Practica, estudia aperturas y guarda tus recursos en un solo lugar.</p></div>
+    <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, marginBottom: 14 }}>{(['Entrenamiento','Videos','Tablero libre','Aperturas'] as const).map(tabButton)}</div>
+    {tab === 'Videos' && <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,minmax(0,1fr))', gap: 12 }}>
+      {[{name:'Ajedrez Magistral',query:'Ajedrez Magistral ajedrez',desc:'Clases, ideas y contenido de ajedrez en español.'},{name:'Rey Enigma',query:'Rey Enigma ajedrez',desc:'Videos, partidas y retos de ajedrez.'}].map(channel => <article key={channel.name} style={panel}><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>CANAL DE YOUTUBE</div><h3 style={{ margin: '6px 0', fontSize: 17 }}>{channel.name}</h3><p style={{ fontSize: 12, color: theme.textMuted }}>{channel.desc}</p><a href={'https://www.youtube.com/results?search_query=' + encodeURIComponent(channel.query) + '&sp=CAI%253D'} target="_blank" rel="noreferrer" style={{ display: 'inline-block', padding: '9px 12px', borderRadius: 9, background: theme.text, color: theme.bg, textDecoration: 'none', fontSize: 11, fontWeight: 900 }}>Ver videos recientes ↗</a></article>)}
+      <article style={{ ...panel, gridColumn: isMobile ? 'auto' : '1 / -1' }}><h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Buscar más videos</h3><p style={{ fontSize: 12, color: theme.textMuted }}>Abre YouTube con resultados recientes sobre el tema que quieras estudiar.</p><a href="https://www.youtube.com/results?search_query=ajedrez+clases+analisis+aperturas&sp=CAI%253D" target="_blank" rel="noreferrer" style={{ color: theme.text, fontWeight: 900, fontSize: 12 }}>Explorar videos de ajedrez ↗</a></article>
+    </div>}
+    {tab === 'Tablero libre' && <section style={panel}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}><div><h2 style={{ fontSize: 17, margin: 0 }}>Tablero de práctica libre</h2><p style={{ fontSize: 11, color: theme.textMuted, margin: '4px 0 0' }}>Mueve cualquier pieza a cualquier casilla. Sin turnos, reloj ni reglas.</p></div><button onClick={() => { setBoard([...START_CHESS_BOARD]); setSelectedSquare(null); }} style={{ padding: '8px 11px', borderRadius: 9, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, cursor: 'pointer', fontWeight: 800 }}>Reiniciar tablero</button></div>
+      <div style={{ width: '100%', maxWidth: 560, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(8,minmax(0,1fr))', border: '3px solid ' + theme.cardBorder, borderRadius: 8, overflow: 'hidden', aspectRatio: '1' }}>
+        {board.map((piece,index) => { const row = Math.floor(index / 8); const col = index % 8; const light = (row + col) % 2 === 0; return <button key={index} draggable={board[index] !== '.'} onDragStart={() => setSelectedSquare(index)} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (selectedSquare !== null && selectedSquare !== index) { setBoard(prev => { const next=[...prev]; next[index]=next[selectedSquare]; next[selectedSquare]='.'; return next; }); setSelectedSquare(null); } }} onClick={() => movePiece(index)} aria-label={'Casilla ' + (8-row) + '-' + (col+1)} style={{ border: 0, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', aspectRatio: '1', cursor: piece === '.' ? 'pointer' : 'grab', background: selectedSquare === index ? '#d6b65b' : light ? '#eee8d5' : '#77916c', color: piece === '.' ? 'transparent' : (piece === piece.toUpperCase() ? '#fff' : '#171717'), fontSize: 'clamp(22px,5vw,43px)', lineHeight: 1, textShadow: piece === piece.toUpperCase() ? '0 1px 2px #333' : '0 1px 1px #fff' }}>{CHESS_PIECES[piece] || ''}</button>; })}
+      </div>
+      <div style={{ textAlign: 'center', fontSize: 10, color: theme.textMuted, marginTop: 10 }}>Selecciona una pieza y luego una casilla destino. También puedes arrastrarla.</div>
+    </section>}
+    {tab === 'Aperturas' && <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(250px,.8fr) minmax(0,1.2fr)', gap: 12, alignItems: 'start' }}>
+      <form onSubmit={addOpening} style={{ ...panel, display: 'flex', flexDirection: 'column', gap: 9 }}><h2 style={{ fontSize: 16, margin: 0 }}>Nueva apertura / variante</h2><input required value={openingName} onChange={e => setOpeningName(e.target.value)} placeholder="Ej. Defensa Siciliana" style={field}/><select value={openingColor} onChange={e => setOpeningColor(e.target.value)} style={field}><option>Blancas</option><option>Negras</option><option>Ambos colores</option></select><textarea value={openingMoves} onChange={e => setOpeningMoves(e.target.value)} rows={3} placeholder="Movimientos o secuencia (ej. 1. e4 c5 2. Cf3…)" style={{ ...field, resize: 'vertical' }}/><textarea value={openingNotes} onChange={e => setOpeningNotes(e.target.value)} rows={4} placeholder="Planes, ideas, trampas, errores que evitar…" style={{ ...field, resize: 'vertical' }}/><button type="submit" style={{ padding: 11, border: 0, borderRadius: 10, background: theme.text, color: theme.bg, fontWeight: 900, cursor: 'pointer' }}>Guardar en repertorio</button></form>
+      <section style={panel}><h2 style={{ fontSize: 16, margin: '0 0 10px' }}>Mi repertorio · {openings.length}</h2>{openings.length === 0 ? <p style={{ fontSize: 12, color: theme.textMuted, textAlign: 'center', padding: 20 }}>Aún no has guardado aperturas.</p> : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{openings.map(opening => <article key={opening.id} style={{ padding: 12, borderRadius: 11, border: '1px solid ' + theme.cardBorder, background: theme.bg, opacity: opening.done ? .62 : 1 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><div><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>{opening.color.toUpperCase()}</div><h3 style={{ fontSize: 14, margin: '4px 0' }}>{opening.name}</h3></div><button onClick={() => setOpenings(prev => prev.filter(x => x.id !== opening.id))} title="Eliminar" style={{ border: 0, background: 'transparent', color: theme.textMuted, cursor: 'pointer' }}><Trash2 size={15}/></button></div>{opening.moves && <div style={{ fontFamily: 'monospace', fontSize: 12, margin: '7px 0', whiteSpace: 'pre-wrap' }}>{opening.moves}</div>}{opening.notes && <p style={{ fontSize: 12, color: theme.textMuted, whiteSpace: 'pre-wrap', margin: '6px 0' }}>{opening.notes}</p>}<button onClick={() => setOpenings(prev => prev.map(x => x.id === opening.id ? { ...x, done: !x.done } : x))} style={{ marginTop: 7, padding: '7px 10px', borderRadius: 8, border: '1px solid ' + theme.cardBorder, background: opening.done ? theme.card : 'transparent', color: theme.text, fontSize: 10, fontWeight: 900, cursor: 'pointer' }}>{opening.done ? '✓ Apertura aprendida · Marcar pendiente' : 'Marcar como aprendida'}</button></article>)}</div>}</section>
+    </div>}
+    {tab === 'Entrenamiento' && <>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,minmax(0,1fr))', gap: 10, marginBottom: 13 }}>
+        <div style={panel}><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>SESIONES</div><div style={{ fontSize: 26, fontWeight: 900 }}>{chessSessions.length}</div></div>
+        <div style={panel}><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>TIEMPO ENTRENADO</div><div style={{ fontSize: 23, fontWeight: 900 }}>{Math.floor(chessSessions.reduce((s,x)=>s+x.minutes,0)/60)} h {chessSessions.reduce((s,x)=>s+x.minutes,0)%60} min</div></div>
+        <div style={panel}><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>ELO ACTUAL</div><input type="number" min="0" value={chessRating} onChange={e => setChessRating(e.target.value)} placeholder="Opcional" style={{ ...field, marginTop: 5 }}/></div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, alignItems: 'start' }}>
+        <section style={panel}><h2 style={{ fontSize: 16, margin: '0 0 9px' }}><Trophy size={17} style={{ display: 'inline', verticalAlign: '-3px' }}/> Mi objetivo</h2><textarea value={chessGoal} onChange={e => setChessGoal(e.target.value)} rows={3} style={{ ...field, resize: 'vertical' }}/><div style={{ fontSize: 12, fontWeight: 900, margin: '14px 0 8px' }}>Áreas de entrenamiento</div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>{['Táctica','Aperturas','Estrategia','Finales','Cálculo','Análisis de partidas'].map(x => <div key={x} style={{ padding: 10, borderRadius: 9, background: theme.bg, border: '1px solid ' + theme.cardBorder, fontSize: 11, fontWeight: 800 }}>{x}</div>)}</div></section>
+        <section style={panel}><h2 style={{ fontSize: 16, margin: '0 0 10px' }}>Registrar entrenamiento</h2><form onSubmit={e => { e.preventDefault(); const mins = Math.max(1, Math.min(600, Number(chessMinutes) || 30)); setChessSessions(prev => [{ id: Date.now(), date: new Date().toISOString().slice(0,10), minutes: mins, focus: chessFocus, notes: chessNotes.trim() }, ...prev]); setChessNotes(''); }} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><select value={chessFocus} onChange={e => setChessFocus(e.target.value)} style={field}>{['Táctica','Aperturas','Estrategia','Finales','Cálculo','Análisis de partidas','Partida rápida','Partida clásica'].map(x => <option key={x}>{x}</option>)}</select><input type="number" min="1" max="600" value={chessMinutes} onChange={e => setChessMinutes(e.target.value)} style={field}/><textarea rows={3} value={chessNotes} onChange={e => setChessNotes(e.target.value)} placeholder="¿Qué aprendiste? ¿Qué quieres repasar?" style={{ ...field, resize: 'vertical' }}/><button type="submit" style={{ padding: 11, border: 0, borderRadius: 10, background: theme.text, color: theme.bg, fontWeight: 900, cursor: 'pointer' }}>Guardar sesión</button></form></section>
+      </div>
+      <section style={{ ...panel, marginTop: 13 }}><h2 style={{ fontSize: 16, margin: '0 0 10px' }}>Bitácora de entrenamiento</h2>{chessSessions.length === 0 ? <p style={{ fontSize: 12, color: theme.textMuted }}>Todavía no hay sesiones registradas.</p> : chessSessions.map(session => <article key={session.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: 10, borderBottom: '1px solid ' + theme.cardBorder }}><div><b style={{ fontSize: 12 }}>{session.focus} · {session.minutes} min</b><div style={{ fontSize: 10, color: theme.textMuted }}>{session.date}</div>{session.notes && <p style={{ fontSize: 12, color: theme.textMuted, whiteSpace: 'pre-wrap' }}>{session.notes}</p>}</div><button onClick={() => setChessSessions(prev => prev.filter(x => x.id !== session.id))} style={{ border: 0, background: 'transparent', color: theme.textMuted, cursor: 'pointer' }}><Trash2 size={15}/></button></article>)}</section>
+    </>}
+  </div>;
+}
 
 
 function DashboardMiniLine({ data, theme }: { data: MoneyPoint[]; theme: any }) {
@@ -4482,99 +4673,29 @@ export default function App() {
         )}
 
 
+
         {/* ================= VISTA: AYUDANTE ================= */}
-        {activeTab === 'ayudante' && (
-          <div style={{maxWidth:1180,margin:'0 auto'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:14,flexWrap:'wrap',marginBottom:20}}>
-              <div><div className="lifeos-overline">CENTRO DE AYUDANTÍAS</div><h1 style={{fontSize:isMobile?25:32,fontWeight:900,margin:'5px 0'}}>Ayudante</h1><p style={{fontSize:13,color:theme.textMuted,margin:0}}>Organiza tus ramos, proyectos, recursos, reuniones y tareas académicas.</p></div>
-              <div style={{padding:'12px 16px',borderRadius:15,border:`1px solid ${theme.cardBorder}`,background:theme.card,minWidth:130}}><div style={{fontSize:10,color:theme.textMuted,fontWeight:800}}>REGISTROS</div><div style={{fontSize:25,fontWeight:900}}>{assistantEntries.length}</div></div>
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'minmax(300px,.85fr) minmax(0,1.5fr)',gap:14,alignItems:'start'}}>
-              <section style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:18,padding:18}}>
-                <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:14}}><Plus size={18}/><h2 style={{fontSize:16,margin:0}}>Nuevo registro</h2></div>
-                <form onSubmit={e=>{e.preventDefault();if(!assistantTitle.trim())return;setAssistantEntries(prev=>[{id:Date.now(),type:assistantType,title:assistantTitle.trim(),course:assistantCourse.trim(),content:assistantContent.trim(),date:assistantDate,weight:assistantWeight,done:false},...prev]);setAssistantTitle('');setAssistantContent('');setAssistantDate('');setAssistantWeight('');}} style={{display:'flex',flexDirection:'column',gap:10}}>
-                  <label style={{fontSize:11,fontWeight:800,color:theme.textMuted}}>TIPO DE REGISTRO</label>
-                  <select value={assistantType} onChange={e=>setAssistantType(e.target.value as AssistantEntryType)} style={{padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text}}>
-                    {(['Ramo','Proyecto','Idea','Fórmula','Reunión','Tarea','Ponderación'] as AssistantEntryType[]).map(t=><option key={t}>{t}</option>)}
-                  </select>
-                  <input required value={assistantTitle} onChange={e=>setAssistantTitle(e.target.value)} placeholder={assistantType==='Ramo'?'Ej. Química General':'Título o nombre'} style={{padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text}}/>
-                  <input value={assistantCourse} onChange={e=>setAssistantCourse(e.target.value)} placeholder="Ramo asociado (opcional)" style={{padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text}}/>
-                  <textarea value={assistantContent} onChange={e=>setAssistantContent(e.target.value)} placeholder={assistantType==='Fórmula'?'Fórmula, variables, unidades y explicación…':assistantType==='Reunión'?'Temas, acuerdos y próximos pasos…':'Detalles, ideas, enlaces o apuntes…'} rows={5} style={{resize:'vertical',padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text,fontFamily:'inherit'}}/>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                    <input type="date" value={assistantDate} onChange={e=>setAssistantDate(e.target.value)} aria-label="Fecha"/>
-                    <input value={assistantWeight} onChange={e=>setAssistantWeight(e.target.value)} placeholder="Ponderación (%)" aria-label="Ponderación" style={{minWidth:0,padding:9,borderRadius:10,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text}}/>
-                  </div>
-                  <button type="submit" style={{padding:12,border:0,borderRadius:11,background:theme.text,color:darkMode?'#090909':'#fff',fontWeight:900,cursor:'pointer'}}>Guardar en Ayudante</button>
-                </form>
-              </section>
-              <section style={{minWidth:0}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:12}}>
-                  <h2 style={{fontSize:17,margin:0}}>Tu espacio de trabajo</h2>
-                  <select value={assistantFilter} onChange={e=>setAssistantFilter(e.target.value as 'Todos'|AssistantEntryType)} style={{padding:'9px 11px',borderRadius:10,border:`1px solid ${theme.cardBorder}`,background:theme.card,color:theme.text}}>
-                    <option>Todos</option>{(['Ramo','Proyecto','Idea','Fórmula','Reunión','Tarea','Ponderación'] as AssistantEntryType[]).map(t=><option key={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(2,minmax(0,1fr))',gap:10}}>
-                  {assistantEntries.filter(item=>assistantFilter==='Todos'||item.type===assistantFilter).map(item=>(
-                    <article key={item.id} style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:16,padding:15,opacity:item.done ? 0.65 : 1}}>
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:9}}>
-                        <span style={{fontSize:10,fontWeight:900,letterSpacing:'.04em',color:theme.textMuted}}>{item.type.toUpperCase()}</span>
-                        <button onClick={()=>setAssistantEntries(prev=>prev.filter(x=>x.id!==item.id))} title="Eliminar registro" aria-label="Eliminar registro" style={{border:0,background:'transparent',color:theme.textMuted,cursor:'pointer'}}><Trash2 size={15}/></button>
-                      </div>
-                      <h3 style={{fontSize:15,margin:'0 0 5px',textDecoration:item.done?'line-through':'none'}}>{item.title}</h3>
-                      {item.course&&<div style={{fontSize:11,color:theme.textMuted,marginBottom:7}}><BookOpen size={12} style={{display:'inline',verticalAlign:'-2px'}}/> {item.course}</div>}
-                      {item.content&&<p style={{fontSize:12,lineHeight:1.55,color:theme.textMuted,whiteSpace:'pre-wrap',margin:'7px 0'}}>{item.content}</p>}
-                      <div style={{display:'flex',gap:8,flexWrap:'wrap',fontSize:10,color:theme.textMuted,marginTop:8}}>
-                        {item.date&&<span><CalendarDays size={11} style={{display:'inline',verticalAlign:'-2px'}}/> {item.date}</span>}
-                        {item.weight&&<span>⚖ {item.weight.includes('%')?item.weight:`${item.weight}%`}</span>}
-                      </div>
-                      {(item.type==='Tarea'||item.type==='Proyecto'||item.type==='Reunión')&&<button onClick={()=>setAssistantEntries(prev=>prev.map(x=>x.id===item.id?{...x,done:!x.done}:x))} style={{marginTop:12,padding:'7px 10px',borderRadius:9,border:`1px solid ${theme.cardBorder}`,background:item.done?theme.activeTab:'transparent',color:theme.text,fontSize:10,fontWeight:800,cursor:'pointer'}}>{item.done?'Reabrir':'Marcar como listo'}</button>}
-                    </article>
-                  ))}
-                </div>
-                {assistantEntries.filter(item=>assistantFilter==='Todos'||item.type===assistantFilter).length===0&&<div style={{padding:30,textAlign:'center',background:theme.card,border:`1px dashed ${theme.cardBorder}`,borderRadius:16,color:theme.textMuted}}><Lightbulb size={25}/><div style={{fontWeight:800,color:theme.text,marginTop:8}}>Tu espacio está listo</div><p style={{fontSize:12,margin:'5px 0 0'}}>Crea tu primer ramo, idea, fórmula, reunión o proyecto desde el formulario.</p></div>}
-              </section>
-            </div>
-          </div>
-        )}
+        {activeTab === 'ayudante' && <AssistantWorkspace theme={theme} isMobile={isMobile} />}
 
         {/* ================= VISTA: AJEDREZ ================= */}
         {activeTab === 'ajedrez' && (
-          <div style={{maxWidth:1050,margin:'0 auto'}}>
-            <div style={{marginBottom:20}}><div className="lifeos-overline">ENTRENAMIENTO PERSONAL</div><h1 style={{fontSize:isMobile?25:32,fontWeight:900,margin:'5px 0'}}>Ajedrez ♟</h1><p style={{fontSize:13,color:theme.textMuted,margin:0}}>Un espacio para practicar con intención, registrar partidas y aprender de tus errores.</p></div>
-            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(3,minmax(0,1fr))',gap:10,marginBottom:14}}>
-              <div style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:16,padding:16}}><div style={{fontSize:10,color:theme.textMuted,fontWeight:900}}>SESIONES</div><div style={{fontSize:27,fontWeight:900,marginTop:4}}>{chessSessions.length}</div></div>
-              <div style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:16,padding:16}}><div style={{fontSize:10,color:theme.textMuted,fontWeight:900}}>TIEMPO ENTRENADO</div><div style={{fontSize:27,fontWeight:900,marginTop:4}}>{Math.floor(chessSessions.reduce((sum,x)=>sum+x.minutes,0)/60)} h {chessSessions.reduce((sum,x)=>sum+x.minutes,0)%60} min</div></div>
-              <div style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:16,padding:16}}><div style={{fontSize:10,color:theme.textMuted,fontWeight:900}}>ELO ACTUAL</div><input type="number" min="0" value={chessRating} onChange={e=>setChessRating(e.target.value)} placeholder="Opcional" style={{width:'100%',boxSizing:'border-box',marginTop:5,padding:7,borderRadius:9,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text}}/></div>
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'minmax(0,1fr) minmax(0,1fr)',gap:14,alignItems:'start'}}>
-              <section style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:18,padding:18}}>
-                <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:12}}><Trophy size={18}/><h2 style={{fontSize:16,margin:0}}>Mi objetivo</h2></div>
-                <textarea value={chessGoal} onChange={e=>setChessGoal(e.target.value)} rows={3} placeholder="Ej. Llegar a 1200 ELO, mejorar cálculo táctico…" style={{width:'100%',boxSizing:'border-box',resize:'vertical',padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text,fontFamily:'inherit'}}/>
-                <h3 style={{fontSize:13,margin:'18px 0 10px'}}>Áreas de entrenamiento</h3>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                  {['Táctica','Aperturas','Estrategia','Finales','Cálculo','Análisis de partidas'].map((area,i)=><div key={area} style={{padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg}}><div style={{fontSize:11,fontWeight:800}}>{area}</div><div style={{fontSize:9,color:theme.textMuted,marginTop:3}}>{['Patrones y combinaciones','Principios y repertorio','Planes y estructuras','Rey y peones','Variantes y precisión','Errores y aprendizajes'][i]}</div></div>)}
-                </div>
-              </section>
-              <section style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:18,padding:18}}>
-                <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:12}}><Plus size={18}/><h2 style={{fontSize:16,margin:0}}>Registrar entrenamiento</h2></div>
-                <form onSubmit={e=>{e.preventDefault();const mins=Math.max(1,Math.min(600,Number(chessMinutes)||30));setChessSessions(prev=>[{id:Date.now(),date:new Date().toISOString().slice(0,10),minutes:mins,focus:chessFocus,notes:chessNotes.trim()},...prev]);setChessNotes('');}} style={{display:'flex',flexDirection:'column',gap:10}}>
-                  <label style={{fontSize:11,color:theme.textMuted,fontWeight:800}}>ÁREA TRABAJADA</label>
-                  <select value={chessFocus} onChange={e=>setChessFocus(e.target.value)} style={{padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text}}>{['Táctica','Aperturas','Estrategia','Finales','Cálculo','Análisis de partidas','Partida rápida','Partida clásica'].map(x=><option key={x}>{x}</option>)}</select>
-                  <label style={{fontSize:11,color:theme.textMuted,fontWeight:800}}>MINUTOS</label>
-                  <input type="number" min="1" max="600" value={chessMinutes} onChange={e=>setChessMinutes(e.target.value)} style={{padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text}}/>
-                  <textarea rows={4} value={chessNotes} onChange={e=>setChessNotes(e.target.value)} placeholder="¿Qué aprendiste? ¿Qué error detectaste? ¿Qué quieres repasar?" style={{resize:'vertical',padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text,fontFamily:'inherit'}}/>
-                  <button type="submit" style={{padding:12,border:0,borderRadius:11,background:theme.text,color:darkMode?'#090909':'#fff',fontWeight:900,cursor:'pointer'}}>Guardar sesión</button>
-                </form>
-              </section>
-            </div>
-            <section style={{marginTop:14,background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:18,padding:18}}>
-              <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:12}}><ClipboardList size={18}/><h2 style={{fontSize:16,margin:0}}>Bitácora de entrenamiento</h2></div>
-              {chessSessions.length===0?<div style={{padding:22,textAlign:'center',color:theme.textMuted}}><Puzzle size={25}/><p style={{fontSize:12}}>Todavía no hay sesiones. Registra tu primera práctica para empezar a medir tu progreso.</p></div>:<div style={{display:'flex',flexDirection:'column',gap:8}}>{chessSessions.map(session=><div key={session.id} style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',padding:12,borderRadius:12,border:`1px solid ${theme.cardBorder}`,background:theme.bg}}><div><div style={{fontSize:12,fontWeight:900}}>{session.focus} · {session.minutes} min</div><div style={{fontSize:10,color:theme.textMuted,marginTop:3}}>{session.date}</div>{session.notes&&<p style={{fontSize:12,whiteSpace:'pre-wrap',margin:'7px 0 0',lineHeight:1.5}}>{session.notes}</p>}</div><button onClick={()=>setChessSessions(prev=>prev.filter(x=>x.id!==session.id))} aria-label="Eliminar sesión" title="Eliminar sesión" style={{border:0,background:'transparent',color:theme.textMuted,cursor:'pointer'}}><Trash2 size={15}/></button></div>)}</div>}
-            </section>
-          </div>
+          <ChessWorkspace
+            theme={theme}
+            isMobile={isMobile}
+            chessSessions={chessSessions}
+            setChessSessions={setChessSessions}
+            chessGoal={chessGoal}
+            setChessGoal={setChessGoal}
+            chessRating={chessRating}
+            setChessRating={setChessRating}
+            chessMinutes={chessMinutes}
+            setChessMinutes={setChessMinutes}
+            chessFocus={chessFocus}
+            setChessFocus={setChessFocus}
+            chessNotes={chessNotes}
+            setChessNotes={setChessNotes}
+          />
         )}
-
         {/* ================= VISTA: ENLACES ================= */}
         {activeTab === 'enlaces' && (
           <div>
