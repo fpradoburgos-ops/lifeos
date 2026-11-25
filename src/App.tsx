@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { EnglishWorkspace, FlashcardsWorkspace, CreatorProjectsWorkspace } from './StudyTools';
 import { 
   Home, 
   GraduationCap, 
   CreditCard, 
   Plus, 
   Flame, 
-  AlertCircle, 
   Wallet, 
   Sun, 
   Moon, 
@@ -13,10 +13,8 @@ import {
   Headphones, 
   BookOpen, 
   Trash2, 
-  Layers, 
   Settings, 
   ShieldAlert, 
-  TrendingUp, 
   ListTodo, 
   CalendarDays, 
   Target, 
@@ -26,18 +24,22 @@ import {
   ChevronRight,
   Menu, 
   Zap, 
-  Clock, 
   CalendarCheck2,
   Bookmark,
   ExternalLink,
   CheckCircle2,
-  BookMarked,
-  Brain,
-  BarChart3,
   Edit3,
   Image,
-  Volume2
+  ClipboardList,
+  Puzzle,
+  Trophy
 } from 'lucide-react';
+
+type LifeOSTab = 'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes' | 'ayudante' | 'ajedrez' | 'ingles' | 'creadores';
+type AssistantEntryType = 'Ramo' | 'Proyecto' | 'Idea' | 'Fórmula' | 'Reunión' | 'Tarea' | 'Ponderación';
+type AssistantEntry = { id: number; type: AssistantEntryType; title: string; course: string; content: string; date: string; weight: string; done: boolean };
+type ChessSession = { id: number; date: string; minutes: number; focus: string; notes: string };
+type ChessOpeningNote = { id: number; name: string; color: string; moves: string; notes: string; done: boolean };
 
 const LIFEOS_CAREER_SEED_VERSION = 'qyf_uchile_2027_v10';
 
@@ -658,6 +660,25 @@ const LIFEOS_V9_CSS = `
     .lifeos-main { padding-left: 22px !important; padding-right: 22px !important; }
   }
 
+  /* LifeOS refined iOS-inspired visual system: solid surfaces, restrained borders, calm spacing */
+  .lifeos-app-shell { width:100% !important; max-width:none !important; }
+  .lifeos-main { width:100% !important; max-width:none !important; }
+  .lifeos-app-shell button { border-radius:12px !important; font-weight:650; letter-spacing:-.01em; box-shadow:none; }
+  .lifeos-app-shell button:focus-visible { outline:2px solid #8b8b92 !important; outline-offset:2px; }
+  .lifeos-app-shell input, .lifeos-app-shell select, .lifeos-app-shell textarea { border-radius:12px !important; }
+  .lifeos-app-shell input:focus, .lifeos-app-shell select:focus, .lifeos-app-shell textarea:focus { border-color:#8b8b92 !important; box-shadow:0 0 0 3px rgba(140,140,150,.13) !important; }
+  .lifeos-app-shell article, .lifeos-app-shell section { border-radius:18px; }
+  .lifeos-app-shell h1, .lifeos-app-shell h2, .lifeos-app-shell h3 { letter-spacing:-.035em; }
+  .lifeos-app-shell p { line-height:1.55; }
+  .lifeos-app-shell button:hover { transform:translateY(-1px); }
+  .lifeos-app-shell button:active { transform:scale(.98); }
+  @media (min-width:1200px) {
+    .lifeos-main { padding-left:clamp(28px,3vw,54px) !important; padding-right:clamp(28px,3vw,54px) !important; }
+  }
+  @media (max-width:639px) {
+    .lifeos-main { padding-left:14px !important; padding-right:14px !important; }
+  }
+
   .lifeos-dashboard { max-width: 1180px; margin: 0 auto; }
   .lifeos-dashboard-header { display:flex; justify-content:space-between; align-items:center; gap:24px; padding:22px 24px; margin-bottom:14px; background:linear-gradient(135deg, #151515, #202020); color:#f5f5f5; border:1px solid #2d2d2d; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.12); }
   .lifeos-overline { display:block; font-size:9px; font-weight:900; letter-spacing:.12em; color:#858585; text-transform:uppercase; }
@@ -763,12 +784,61 @@ const LIFEOS_V9_CSS = `
   ::view-transition-new(root) { animation:lifeos-vt-new .22s cubic-bezier(.2,.75,.2,1) both; }
   @keyframes lifeos-vt-old { to { opacity:0; transform:scale(.995); filter:blur(1px); } }
   @keyframes lifeos-vt-new { from { opacity:0; transform:translateY(6px) scale(.995); filter:blur(2px); } to { opacity:1; transform:none; filter:none; } }
+  .lifeos-main { min-width:0; width:100%; max-width:none !important; box-sizing:border-box; }
+  .lifeos-app-shell { width:100%; max-width:none; min-width:0; }
+  .lifeos-dashboard { max-width:1500px; }
+  @media (min-width: 1200px) { .lifeos-main { padding-left:clamp(28px,3vw,56px) !important; padding-right:clamp(28px,3vw,56px) !important; } }
   @media (prefers-reduced-motion: reduce) {
     .lifeos-dash-card, .lifeos-dashboard-footer-card, .lifeos-card, .lifeos-animated-panel, .lifeos-chart-epic, .lifeos-chart-line, .lifeos-chart-baseline, .lifeos-page-transition, .lifeos-modal-overlay, .lifeos-modal-card { animation:none !important; }
     * { scroll-behavior:auto !important; }
   }
 
   :root { --lifeos-card-bg: #141416; --lifeos-card-border:#27272a; --lifeos-text:#f4f4f5; --lifeos-muted:#8e8e93; --lifeos-card:#141416; }
+
+  /* LifeOS · acabado iOS sobrio, sin transparencias ni efecto cristal */
+  html[data-lifeos-theme='dark'] body { background:#09090b; }
+  html[data-lifeos-theme='light'] body { background:#f4f4f5; }
+  .lifeos-app-shell { min-height:100vh; letter-spacing:-.01em; }
+  .lifeos-dash-card, .lifeos-dashboard-footer-card, .lifeos-card, .lifeos-animated-panel {
+    border-radius:18px !important;
+  }
+  .lifeos-dashboard-header {
+    border-radius:20px;
+    padding:26px 28px;
+    background:linear-gradient(145deg,#18181b,#242427);
+    border-color:#303034;
+    box-shadow:0 12px 32px rgba(0,0,0,.10);
+  }
+  .lifeos-header-actions button { border-radius:12px; }
+  .lifeos-app-shell aside nav button { border-radius:14px !important; }
+  .lifeos-app-shell input, .lifeos-app-shell select, .lifeos-app-shell textarea {
+    border-radius:12px !important;
+  }
+  .lifeos-app-shell button:focus-visible,
+  .lifeos-app-shell input:focus-visible,
+  .lifeos-app-shell select:focus-visible,
+  .lifeos-app-shell textarea:focus-visible {
+    outline:2px solid #a1a1aa;
+    outline-offset:2px;
+  }
+  html[data-lifeos-theme='light'] .lifeos-dashboard-header {
+    background:linear-gradient(145deg,#ffffff,#ededf0);
+    color:#18181b;
+    border-color:#e4e4e7;
+    box-shadow:0 12px 32px rgba(24,24,27,.06);
+  }
+  html[data-lifeos-theme='light'] .lifeos-dashboard-header .lifeos-overline,
+  html[data-lifeos-theme='light'] .lifeos-dashboard-header .lifeos-date-week,
+  html[data-lifeos-theme='light'] .lifeos-dashboard-header p { color:#71717a; }
+  html[data-lifeos-theme='light'] .lifeos-dashboard-header h1 { color:#18181b; }
+  html[data-lifeos-theme='light'] .lifeos-header-actions button {
+    background:#ffffff;
+    border-color:#dedee3;
+    color:#27272a;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lifeos-app-shell button { transition:none !important; }
+  }
 
   @media (max-width: 639px) {
     .lifeos-main { padding: 12px !important; }
@@ -797,6 +867,337 @@ const LIFEOS_V9_CSS = `
     .lifeos-music-frame { height:80px; }
   }
 `;
+
+
+
+type AssistantCourseSection = 'Recursos a presentar' | 'Recursos a crear' | 'Ponderaciones' | 'Próximas evaluaciones' | 'Reuniones' | 'Clases a impartir' | 'Apuntes';
+type AssistantCourseItem = { id: number; section: AssistantCourseSection; title: string; detail: string; date: string; weight: string; done: boolean };
+type AssistantContact = { id:number; name:string; role:string; email:string; phone:string; notes:string };
+type AssistantCourse = { id: number; name: string; code: string; description: string; items: AssistantCourseItem[]; contacts?: AssistantContact[] };
+
+
+const ASSISTANT_SECTIONS: (AssistantCourseSection | 'Contactos docentes')[] = ['Recursos a presentar','Recursos a crear','Ponderaciones','Próximas evaluaciones','Reuniones','Clases a impartir','Apuntes','Contactos docentes'];
+
+function AssistantWorkspace({ theme, isMobile }: { theme: any; isMobile: boolean }) {
+  const [courses, setCourses] = useState<AssistantCourse[]>(() => {
+    try {
+      const saved = localStorage.getItem('lifeos_assistant_courses');
+      if (saved) return JSON.parse(saved);
+      const legacy = JSON.parse(localStorage.getItem('lifeos_assistant_entries') || '[]');
+      return (Array.isArray(legacy) ? legacy : []).filter((x: any) => x.type === 'Ramo').map((x: any) => ({
+        id: x.id, name: x.title || 'Ramo sin nombre', code: '', description: x.content || '',
+        items: []
+      }));
+    } catch { return []; }
+  });
+  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  const [section, setSection] = useState<AssistantCourseSection | 'Contactos docentes'>('Recursos a presentar');
+  const [courseName, setCourseName] = useState('');
+  const [courseCode, setCourseCode] = useState('');
+  const [courseDescription, setCourseDescription] = useState('');
+  const [itemTitle, setItemTitle] = useState('');
+  const [itemDetail, setItemDetail] = useState('');
+  const [itemDate, setItemDate] = useState('');
+  const [itemWeight, setItemWeight] = useState('');
+  const [showCourseForm, setShowCourseForm] = useState(false);
+  const [contactName,setContactName]=useState(''); const [contactRole,setContactRole]=useState('Profesor/a'); const [contactEmail,setContactEmail]=useState(''); const [contactPhone,setContactPhone]=useState(''); const [contactNotes,setContactNotes]=useState('');
+
+  useEffect(() => { localStorage.setItem('lifeos_assistant_courses', JSON.stringify(courses)); }, [courses]);
+  const selectedCourse = courses.find(c => c.id === selectedCourseId) || null;
+  const sectionItems = selectedCourse?.items.filter(item => item.section === section) || [];
+  const courseContacts = selectedCourse?.contacts || [];
+  const addContact = (event:React.FormEvent) => { event.preventDefault(); if(!selectedCourse || !contactName.trim() || (!contactEmail.trim() && !contactPhone.trim())) return; const contact:AssistantContact={id:Date.now(),name:contactName.trim(),role:contactRole,email:contactEmail.trim(),phone:contactPhone.trim(),notes:contactNotes.trim()}; setCourses(prev=>prev.map(c=>c.id===selectedCourse.id?{...c,contacts:[...(c.contacts||[]),contact]}:c)); setContactName('');setContactEmail('');setContactPhone('');setContactNotes(''); };
+  const ponderationTotal = (selectedCourse?.items || []).filter(item => item.section === 'Ponderaciones').reduce((sum, item) => sum + (Number(String(item.weight).replace(',', '.').replace('%', '').trim()) || 0), 0);
+  const panel = { background: theme.card, border: '1px solid ' + theme.cardBorder, borderRadius: 17, padding: 17 };
+  const field = { width: '100%', boxSizing: 'border-box' as const, padding: 11, borderRadius: 10, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, font: 'inherit' };
+
+  const createCourse = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!courseName.trim()) return;
+    const next: AssistantCourse = { id: Date.now(), name: courseName.trim(), code: courseCode.trim(), description: courseDescription.trim(), items: [] };
+    setCourses(prev => [next, ...prev]);
+    setSelectedCourseId(next.id);
+    setCourseName(''); setCourseCode(''); setCourseDescription(''); setShowCourseForm(false);
+  };
+  const addItem = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedCourse || !itemTitle.trim()) return;
+    if(section==='Contactos docentes') return;
+    const item: AssistantCourseItem = { id: Date.now(), section, title: itemTitle.trim(), detail: itemDetail.trim(), date: itemDate, weight: itemWeight.trim(), done: false };
+    setCourses(prev => prev.map(course => course.id === selectedCourse.id ? { ...course, items: [item, ...course.items] } : course));
+    setItemTitle(''); setItemDetail(''); setItemDate(''); setItemWeight('');
+  };
+  const updateItem = (itemId: number, changes: Partial<AssistantCourseItem>) => {
+    if (!selectedCourse) return;
+    setCourses(prev => prev.map(course => course.id === selectedCourse.id ? { ...course, items: course.items.map(item => item.id === itemId ? { ...item, ...changes } : item) } : course));
+  };
+  const deleteCourse = (id: number) => {
+    if (!window.confirm('¿Eliminar este ramo y todos sus registros de ayudantía?')) return;
+    setCourses(prev => prev.filter(course => course.id !== id));
+    if (selectedCourseId === id) setSelectedCourseId(null);
+  };
+
+  return <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
+      <div><div className="lifeos-overline">CENTRO DE AYUDANTÍAS · ESPACIO INDEPENDIENTE</div><h1 style={{ fontSize: isMobile ? 25 : 32, fontWeight: 900, margin: '5px 0' }}>Ayudante</h1><p style={{ fontSize: 13, color: theme.textMuted, margin: 0 }}>Administra tus ayudantías sin mezclarlas con tus ramos ni notas personales.</p></div>
+      {selectedCourse && <button onClick={() => setSelectedCourseId(null)} style={{ padding: '9px 13px', borderRadius: 10, border: '1px solid ' + theme.cardBorder, background: theme.card, color: theme.text, fontWeight: 800, cursor: 'pointer' }}>← Todos los ramos</button>}
+    </div>
+    {!selectedCourse ? <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div><h2 style={{ margin: 0, fontSize: 18 }}>Mis ramos de ayudantía</h2><p style={{ margin: '4px 0 0', fontSize: 12, color: theme.textMuted }}>{courses.length} {courses.length === 1 ? 'ramo registrado' : 'ramos registrados'}</p></div>
+        <button onClick={() => setShowCourseForm(v => !v)} style={{ padding: '10px 14px', border: 0, borderRadius: 11, background: theme.text, color: theme.bg, fontWeight: 900, cursor: 'pointer' }}><Plus size={15} style={{ display: 'inline', verticalAlign: '-3px' }}/> Nuevo ramo</button>
+      </div>
+      {showCourseForm && <form onSubmit={createCourse} style={{ ...panel, display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 180px', gap: 10, marginBottom: 14 }}>
+        <input required value={courseName} onChange={e => setCourseName(e.target.value)} placeholder="Nombre del ramo" style={field}/>
+        <input value={courseCode} onChange={e => setCourseCode(e.target.value)} placeholder="Código / sección" style={field}/>
+        <textarea value={courseDescription} onChange={e => setCourseDescription(e.target.value)} placeholder="Descripción, docente, horario u otros datos (opcional)" rows={2} style={{ ...field, gridColumn: isMobile ? 'auto' : '1 / -1', resize: 'vertical' }}/>
+        <button type="submit" style={{ padding: 11, border: 0, borderRadius: 10, background: theme.text, color: theme.bg, fontWeight: 900, cursor: 'pointer', gridColumn: isMobile ? 'auto' : '1 / -1' }}>Crear espacio del ramo</button>
+      </form>}
+      {courses.length === 0 ? <div style={{ ...panel, textAlign: 'center', padding: 34, color: theme.textMuted }}><GraduationCap size={28}/><h3 style={{ color: theme.text, margin: '9px 0 4px' }}>Todavía no tienes ramos de ayudantía</h3><p style={{ fontSize: 12, margin: 0 }}>Crea un ramo para organizar materiales, evaluaciones, ponderaciones y clases.</p></div> :
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,minmax(0,1fr))', gap: 12 }}>
+          {courses.map(course => <article key={course.id} style={{ ...panel, textAlign: 'left' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><div><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>{course.code || 'AYUDANTÍA'}</div><h3 style={{ fontSize: 17, margin: '5px 0' }}>{course.name}</h3></div><button onClick={() => deleteCourse(course.id)} title="Eliminar ramo" style={{ border: 0, background: 'transparent', color: theme.textMuted, cursor: 'pointer' }}><Trash2 size={16}/></button></div>
+            {course.description && <p style={{ fontSize: 12, color: theme.textMuted, lineHeight: 1.5 }}>{course.description}</p>}
+            <div style={{ fontSize: 11, color: theme.textMuted, margin: '12px 0' }}>{course.items.length} registros · {course.items.filter(x => !x.done).length} pendientes</div>
+            <button onClick={() => { setSelectedCourseId(course.id); setSection('Recursos a presentar'); }} style={{ width: '100%', padding: 10, border: '1px solid ' + theme.cardBorder, borderRadius: 10, background: theme.bg, color: theme.text, fontWeight: 900, cursor: 'pointer' }}>Abrir ramo <span aria-hidden="true">→</span></button>
+          </article>)}
+        </div>}
+    </> : <>
+      <div style={{ ...panel, marginBottom: 14 }}>
+        <div className="lifeos-overline">{selectedCourse.code || 'ESPACIO DE AYUDANTÍA'}</div><h2 style={{ fontSize: 22, margin: '5px 0' }}>{selectedCourse.name}</h2>{selectedCourse.description && <p style={{ color: theme.textMuted, fontSize: 12, margin: 0 }}>{selectedCourse.description}</p>}
+      </div>
+      <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 9, marginBottom: 12 }}>
+        {ASSISTANT_SECTIONS.map(name => <button key={name} onClick={() => setSection(name)} style={{ whiteSpace: 'nowrap', padding: '9px 11px', borderRadius: 10, border: '1px solid ' + theme.cardBorder, background: section === name ? theme.text : theme.card, color: section === name ? theme.bg : theme.text, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{name}</button>)}
+      </div>
+      {section === 'Contactos docentes' && <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'minmax(260px,.8fr) minmax(0,1.2fr)',gap:13,alignItems:'start'}}>
+        <form onSubmit={addContact} style={{...panel,display:'grid',gap:9}}><h3 style={{margin:0,fontSize:15}}>Agregar contacto docente</h3>
+          <input required value={contactName} onChange={e=>setContactName(e.target.value)} placeholder="Nombre del profesor/a" style={field}/>
+          <select value={contactRole} onChange={e=>setContactRole(e.target.value)} style={field}>{['Profesor/a','Coordinador/a','Ayudante coordinador/a','Secretaría docente','Otro'].map(x=><option key={x}>{x}</option>)}</select>
+          <input type="email" value={contactEmail} onChange={e=>setContactEmail(e.target.value)} placeholder="Correo institucional" style={field}/>
+          <input type="tel" value={contactPhone} onChange={e=>setContactPhone(e.target.value)} placeholder="Teléfono / WhatsApp" style={field}/>
+          <textarea rows={3} value={contactNotes} onChange={e=>setContactNotes(e.target.value)} placeholder="Horario de consulta, oficina u otras notas" style={{...field,resize:'vertical'}}/>
+          <button type="submit" style={{padding:11,border:0,borderRadius:11,background:theme.text,color:theme.bg,fontWeight:850,cursor:'pointer'}}>Guardar contacto</button>
+          <p style={{fontSize:10,color:theme.textMuted}}>Ingresa al menos un correo o teléfono. Los datos quedan asociados solo a este ramo de ayudantía.</p>
+        </form>
+        <section style={panel}><h3 style={{margin:'0 0 10px',fontSize:15}}>Directorio del ramo · {courseContacts.length}</h3>{courseContacts.length?courseContacts.map(c=><article key={c.id} style={{padding:12,border:'1px solid '+theme.cardBorder,borderRadius:13,marginBottom:8,background:theme.bg}}><div style={{display:'flex',justifyContent:'space-between',gap:8}}><div><strong style={{fontSize:13}}>{c.name}</strong><div style={{fontSize:11,color:theme.textMuted}}>{c.role}</div></div><button onClick={()=>setCourses(prev=>prev.map(x=>x.id===selectedCourse.id?{...x,contacts:(x.contacts||[]).filter(y=>y.id!==c.id)}:x))} style={{border:0,background:'transparent',color:theme.textMuted,cursor:'pointer'}}>Eliminar</button></div>{c.email&&<div style={{fontSize:12,marginTop:8}}>✉ <a href={'mailto:'+c.email} style={{color:theme.text}}>{c.email}</a></div>}{c.phone&&<div style={{fontSize:12,marginTop:5}}>☎ <a href={'tel:'+c.phone} style={{color:theme.text}}>{c.phone}</a></div>}{c.notes&&<p style={{fontSize:11,color:theme.textMuted,marginTop:7}}>{c.notes}</p>}</article>):<p style={{fontSize:12,color:theme.textMuted}}>Todavía no has guardado profesores para este ramo.</p>}</section>
+      </div>}
+      {section === 'Ponderaciones' && <div style={{ ...panel, marginBottom: 13 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}><strong style={{ fontSize: 13 }}>Ponderación acumulada</strong><strong style={{ fontSize: 16 }}>{ponderationTotal}%</strong></div><div style={{ height: 7, borderRadius: 99, background: theme.bg, overflow: 'hidden', marginTop: 9 }}><div style={{ height: '100%', width: Math.min(100, ponderationTotal) + '%', background: ponderationTotal > 100 ? '#dc6b6b' : theme.text, borderRadius: 99, transition: 'width .2s ease' }}/></div><p style={{ fontSize: 11, color: theme.textMuted, marginTop: 7 }}>{ponderationTotal === 100 ? 'Las evaluaciones suman 100%.' : ponderationTotal > 100 ? 'La suma supera el 100%; revisa los porcentajes.' : 'Registra cada evaluación y su porcentaje hasta completar el 100%.'}</p></div>}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(260px,.8fr) minmax(0,1.3fr)', gap: 13, alignItems: 'start' }}>
+        <form onSubmit={addItem} style={{ ...panel, display: 'flex', flexDirection: 'column', gap: 9 }}>
+          <h3 style={{ margin: 0, fontSize: 15 }}>Agregar · {section}</h3>
+          <input required value={itemTitle} onChange={e => setItemTitle(e.target.value)} placeholder={section === 'Ponderaciones' ? 'Ej. Certamen 1' : 'Título o nombre'} style={field}/>
+          <textarea value={itemDetail} onChange={e => setItemDetail(e.target.value)} rows={4} placeholder="Descripción, instrucciones, enlace o apuntes…" style={{ ...field, resize: 'vertical' }}/>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <input type="date" value={itemDate} onChange={e => setItemDate(e.target.value)} style={field}/>
+            <input value={itemWeight} onChange={e => setItemWeight(e.target.value)} placeholder="Ponderación %" style={field}/>
+          </div>
+          <button type="submit" style={{ padding: 11, border: 0, borderRadius: 10, background: theme.text, color: theme.bg, fontWeight: 900, cursor: 'pointer' }}>Guardar registro</button>
+        </form>
+        <section style={{ ...panel, minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', marginBottom: 10 }}><h3 style={{ fontSize: 15, margin: 0 }}>{section}</h3><span style={{ fontSize: 11, color: theme.textMuted }}>{sectionItems.length} registros</span></div>
+          {sectionItems.length === 0 ? <div style={{ padding: 25, textAlign: 'center', color: theme.textMuted, fontSize: 12 }}>Aún no hay registros en este apartado.</div> :
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{sectionItems.map(item => <article key={item.id} style={{ padding: 12, borderRadius: 12, border: '1px solid ' + theme.cardBorder, background: theme.bg, opacity: item.done ? .62 : 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}><div style={{ minWidth: 0 }}><div style={{ fontWeight: 900, fontSize: 13, textDecoration: item.done ? 'line-through' : 'none' }}>{item.title}</div>{item.detail && <p style={{ whiteSpace: 'pre-wrap', fontSize: 12, color: theme.textMuted, lineHeight: 1.5, margin: '6px 0' }}>{item.detail}</p>}<div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 10, color: theme.textMuted }}>{item.date && <span>📅 {item.date}</span>}{item.weight && <span>⚖ {item.weight.includes('%') ? item.weight : item.weight + '%'}</span>}</div></div><button onClick={() => updateItem(item.id, { done: !item.done })} title={item.done ? 'Reabrir' : 'Marcar como listo'} style={{ border: '1px solid ' + theme.cardBorder, background: item.done ? theme.card : 'transparent', color: theme.text, borderRadius: 8, padding: 6, cursor: 'pointer' }}>{item.done ? <CheckCircle2 size={16}/> : <CheckCircle2 size={16} opacity={.45}/>}</button></div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 5 }}><button onClick={() => setCourses(prev => prev.map(c => c.id === selectedCourse.id ? { ...c, items: c.items.filter(x => x.id !== item.id) } : c))} style={{ border: 0, background: 'transparent', color: theme.textMuted, fontSize: 10, cursor: 'pointer' }}>Eliminar</button></div>
+            </article>)}</div>}
+        </section>
+      </div>
+    </>}
+  </div>;
+}
+
+const CHESS_PIECES: Record<string, string> = { 'K':'♔','Q':'♕','R':'♖','B':'♗','N':'♘','P':'♙','k':'♚','q':'♛','r':'♜','b':'♝','n':'♞','p':'♟' };
+const START_CHESS_BOARD = 'rnbqkbnrpppppppp................................PPPPPPPPRNBQKBNR'.split('');
+
+type ChessSide = 'white' | 'black';
+const chessSideOf = (piece:string):ChessSide | null => !piece || piece==='.' ? null : piece===piece.toUpperCase() ? 'white' : 'black';
+const chessFindKing = (board:string[],side:ChessSide) => board.findIndex(p=>p===(side==='white'?'K':'k'));
+const chessAttacked = (board:string[],target:number,by:ChessSide):boolean => {
+  const tr=Math.floor(target/8),tc=target%8;
+  for(let i=0;i<64;i++){
+    const p=board[i]; if(p==='.' || chessSideOf(p)!==by) continue;
+    const r=Math.floor(i/8),c=i%8,dr=tr-r,dc=tc-c,kind=p.toLowerCase();
+    if(kind==='p'){const dir=by==='white'?-1:1;if(dr===dir&&Math.abs(dc)===1)return true;continue;}
+    if(kind==='n'&&((Math.abs(dr)===2&&Math.abs(dc)===1)||(Math.abs(dr)===1&&Math.abs(dc)===2)))return true;
+    if(kind==='k'&&Math.max(Math.abs(dr),Math.abs(dc))===1)return true;
+    const diagonal=Math.abs(dr)===Math.abs(dc)&&dr!==0;
+    const straight=(dr===0&&dc!==0)||(dc===0&&dr!==0);
+    if((kind==='b'&&diagonal)||(kind==='r'&&straight)||(kind==='q'&&(diagonal||straight))){
+      const sr=Math.sign(dr),sc=Math.sign(dc);let rr=r+sr,cc=c+sc,clear=true;
+      while(rr!==tr||cc!==tc){if(board[rr*8+cc]!=='.'){clear=false;break;}rr+=sr;cc+=sc;}
+      if(clear)return true;
+    }
+  }
+  return false;
+};
+const chessInCheck = (board:string[],side:ChessSide):boolean => {
+  const king=chessFindKing(board,side);
+  return king<0 ? false : chessAttacked(board,king,side==='white'?'black':'white');
+};
+const chessPseudoMove = (board:string[],from:number,to:number,side:ChessSide):boolean => {
+  if(from===to)return false;
+  const p=board[from],target=board[to];if(p==='.'||chessSideOf(p)!==side||chessSideOf(target)===side||target.toLowerCase()==='k')return false;
+  const r=Math.floor(from/8),c=from%8,tr=Math.floor(to/8),tc=to%8,dr=tr-r,dc=tc-c,kind=p.toLowerCase();
+  if(kind==='p'){
+    const dir=side==='white'?-1:1,start=side==='white'?6:1;
+    if(dc===0&&dr===dir&&target==='.')return true;
+    if(dc===0&&r===start&&dr===2*dir&&target==='.'&&board[(r+dir)*8+c]==='.')return true;
+    return Math.abs(dc)===1&&dr===dir&&target!=='.'&&chessSideOf(target)!==side;
+  }
+  if(kind==='n')return (Math.abs(dr)===2&&Math.abs(dc)===1)||(Math.abs(dr)===1&&Math.abs(dc)===2);
+  if(kind==='k')return Math.max(Math.abs(dr),Math.abs(dc))===1;
+  const diagonal=Math.abs(dr)===Math.abs(dc)&&dr!==0,straight=(dr===0&&dc!==0)||(dc===0&&dr!==0);
+  if(!((kind==='b'&&diagonal)||(kind==='r'&&straight)||(kind==='q'&&(diagonal||straight))))return false;
+  const sr=Math.sign(dr),sc=Math.sign(dc);let rr=r+sr,cc=c+sc;
+  while(rr!==tr||cc!==tc){if(board[rr*8+cc]!=='.')return false;rr+=sr;cc+=sc;}
+  return true;
+};
+const chessLegalMove = (board:string[],from:number,to:number,side:ChessSide):boolean => {
+  if(!chessPseudoMove(board,from,to,side))return false;
+  const next=[...board];next[to]=next[from];next[from]='.';
+  if(next[to].toLowerCase()==='p'&&(Math.floor(to/8)===0||Math.floor(to/8)===7))next[to]=side==='white'?'Q':'q';
+  return !chessInCheck(next,side);
+};
+const chessLegalDestinations = (board:string[],from:number,side:ChessSide):number[] => Array.from({length:64},(_,i)=>i).filter(to=>chessLegalMove(board,from,to,side));
+const chessHasLegalMove = (board:string[],side:ChessSide):boolean => board.some((p,from)=>chessSideOf(p)===side&&chessLegalDestinations(board,from,side).length>0);
+
+
+function ChessWorkspace(props: {
+  theme: any; isMobile: boolean; chessSessions: ChessSession[]; setChessSessions: React.Dispatch<React.SetStateAction<ChessSession[]>>;
+  chessGoal: string; setChessGoal: (value: string) => void; chessRating: string; setChessRating: (value: string) => void;
+  chessMinutes: string; setChessMinutes: (value: string) => void; chessFocus: string; setChessFocus: (value: string) => void;
+  chessNotes: string; setChessNotes: (value: string) => void;
+}) {
+  const { theme, isMobile, chessSessions, setChessSessions, chessGoal, setChessGoal, chessRating, setChessRating, chessMinutes, setChessMinutes, chessFocus, setChessFocus, chessNotes, setChessNotes } = props;
+  const [tab, setTab] = useState<'Entrenamiento'|'Videos'|'Tablero libre'|'Aperturas'|'Recursos'>('Entrenamiento');
+  const [board, setBoard] = useState<string[]>(() => [...START_CHESS_BOARD]);
+  const [selectedSquare, setSelectedSquare] = useState<number | null>(null);
+  const [boardFlipped, setBoardFlipped] = useState(false);
+  const [boardHistory, setBoardHistory] = useState<{board:string[];turn:ChessSide;move:string}[]>([]);
+  const [boardTurn,setBoardTurn] = useState<ChessSide>('white');
+  const [boardMoves,setBoardMoves] = useState<string[]>([]);
+  const [boardNotice,setBoardNotice] = useState('Blancas comienzan. Selecciona una pieza para ver sus movimientos legales.');
+  const [boardResult,setBoardResult] = useState<'playing'|'check'|'mate'|'stalemate'>('playing');
+  const legalTargets = selectedSquare===null ? [] : chessLegalDestinations(board,selectedSquare,boardTurn);
+  const [openings, setOpenings] = useState<ChessOpeningNote[]>(() => { try { return JSON.parse(localStorage.getItem('lifeos_chess_openings') || '[]'); } catch { return []; } });
+  const [openingName, setOpeningName] = useState('');
+  const [openingColor, setOpeningColor] = useState('Blancas');
+  const [openingMoves, setOpeningMoves] = useState('');
+  const [openingNotes, setOpeningNotes] = useState('');
+  const [readingResources, setReadingResources] = useState<{id:number;title:string;url:string}[]>(() => { try { const saved=JSON.parse(localStorage.getItem('lifeos_chess_resources') || 'null'); return Array.isArray(saved) && saved.length ? saved : [{id:-1,title:'Chess Strategy — Edward Lasker',url:'https://www.gutenberg.org/files/5614/5614-h/5614-h.htm'},{id:-2,title:'The Blue Book of Chess — Howard Staunton',url:'https://www.gutenberg.org/files/16377/16377-h/16377-h.htm'},{id:-3,title:'Studies of Chess — François Philidor',url:'https://www.gutenberg.org/ebooks/78804'},{id:-4,title:'Chess and Checkers — Edward Lasker',url:'https://www.gutenberg.org/ebooks/4903'}]; } catch { return []; } });
+  const [resourceTitle, setResourceTitle] = useState('');
+  const [resourceUrl, setResourceUrl] = useState('');
+  const [selectedResourceId, setSelectedResourceId] = useState<number | null>(null);
+  useEffect(() => { localStorage.setItem('lifeos_chess_openings', JSON.stringify(openings)); }, [openings]);
+  useEffect(() => { localStorage.setItem('lifeos_chess_resources', JSON.stringify(readingResources)); }, [readingResources]);
+  const panel = { background: theme.card, border: '1px solid ' + theme.cardBorder, borderRadius: 17, padding: 16 };
+  const field = { width: '100%', boxSizing: 'border-box' as const, padding: 10, borderRadius: 10, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, font: 'inherit' };
+  const movePiece = (index: number) => {
+    if(boardResult==='mate'||boardResult==='stalemate'){setBoardNotice('La partida terminó. Pulsa Nueva partida para comenzar otra.');return;}
+    if (selectedSquare===null) {
+      if(chessSideOf(board[index])===boardTurn){setSelectedSquare(index);setBoardNotice('Destinos legales resaltados. Elige una casilla.');}
+      else setBoardNotice(board[index]==='.'?'Selecciona una de tus piezas.':'Es el turno de '+(boardTurn==='white'?'las blancas':'las negras')+'.');
+      return;
+    }
+    if(index===selectedSquare){setSelectedSquare(null);setBoardNotice('Selección cancelada.');return;}
+    if(chessSideOf(board[index])===boardTurn){setSelectedSquare(index);setBoardNotice('Pieza seleccionada. Elige uno de los destinos resaltados.');return;}
+    if(!chessLegalMove(board,selectedSquare,index,boardTurn)){setBoardNotice('Movimiento ilegal: esa casilla no es un destino válido o dejaría a tu rey en jaque.');return;}
+    const from=selectedSquare, moving=board[from], next=[...board];next[index]=moving;next[from]='.';
+    const promotion=moving.toLowerCase()==='p'&&(Math.floor(index/8)===0||Math.floor(index/8)===7);
+    if(promotion)next[index]=boardTurn==='white'?'Q':'q';
+    const notation=String.fromCharCode(97+(from%8))+(8-Math.floor(from/8))+'–'+String.fromCharCode(97+(index%8))+(8-Math.floor(index/8))+(promotion?'=Q':'');
+    const nextTurn:ChessSide=boardTurn==='white'?'black':'white';
+    const check=chessInCheck(next,nextTurn),hasMoves=chessHasLegalMove(next,nextTurn);
+    setBoardHistory(prev=>[...prev,{board:[...board],turn:boardTurn,move:notation}]);
+    setBoard(next);setBoardTurn(nextTurn);setBoardMoves(prev=>[...prev,notation]);setSelectedSquare(null);
+    if(!hasMoves){setBoardResult(check?'mate':'stalemate');setBoardNotice(check?'Jaque mate. Partida terminada.':'Tablas por ahogado. Partida terminada.');}
+    else if(check){setBoardResult('check');setBoardNotice('¡Jaque! Juegan '+(nextTurn==='white'?'las blancas':'las negras')+'.');}
+    else {setBoardResult('playing');setBoardNotice('Juegan '+(nextTurn==='white'?'las blancas':'las negras')+'.');}
+  };
+  const undoBoardMove=()=>{const last=boardHistory[boardHistory.length-1];if(!last)return;setBoard(last.board);setBoardTurn(last.turn);setBoardHistory(prev=>prev.slice(0,-1));setBoardMoves(prev=>prev.slice(0,-1));setSelectedSquare(null);setBoardResult('playing');setBoardNotice('Último movimiento deshecho.');};
+  const resetBoard=()=>{setBoard([...START_CHESS_BOARD]);setBoardHistory([]);setBoardTurn('white');setBoardMoves([]);setSelectedSquare(null);setBoardFlipped(false);setBoardResult('playing');setBoardNotice('Nueva partida. Juegan las blancas.');};
+  const addOpening = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!openingName.trim()) return;
+    setOpenings(prev => [{ id: Date.now(), name: openingName.trim(), color: openingColor, moves: openingMoves.trim(), notes: openingNotes.trim(), done: false }, ...prev]);
+    setOpeningName(''); setOpeningMoves(''); setOpeningNotes('');
+  };
+  const tabButton = (name: typeof tab) => <button key={name} onClick={() => setTab(name)} style={{ whiteSpace: 'nowrap', padding: '10px 14px', borderRadius: 10, border: '1px solid ' + theme.cardBorder, background: tab === name ? theme.text : theme.card, color: tab === name ? theme.bg : theme.text, fontWeight: 900, fontSize: 12, cursor: 'pointer' }}>{name}</button>;
+
+  return <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ marginBottom: 18 }}><div className="lifeos-overline">ENTRENAMIENTO PERSONAL</div><h1 style={{ fontSize: isMobile ? 25 : 32, fontWeight: 900, margin: '5px 0' }}>Ajedrez ♟</h1><p style={{ fontSize: 13, color: theme.textMuted, margin: 0 }}>Practica, estudia aperturas y guarda tus recursos en un solo lugar.</p></div>
+    <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, marginBottom: 14 }}>{(['Entrenamiento','Videos','Tablero libre','Aperturas','Recursos'] as const).map(tabButton)}</div>
+    {tab === 'Videos' && <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,minmax(0,1fr))', gap: 12 }}>
+      {[{name:'Ajedrez Magistral',query:'Ajedrez Magistral ajedrez',desc:'Clases, ideas y contenido de ajedrez en español.'},{name:'Rey Enigma',query:'Rey Enigma ajedrez',desc:'Videos, partidas y retos de ajedrez.'}].map(channel => <article key={channel.name} style={panel}><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>CANAL DE YOUTUBE</div><h3 style={{ margin: '6px 0', fontSize: 17 }}>{channel.name}</h3><p style={{ fontSize: 12, color: theme.textMuted }}>{channel.desc}</p><a href={'https://www.youtube.com/results?search_query=' + encodeURIComponent(channel.query) + '&sp=CAI%3D'} target="_blank" rel="noreferrer" style={{ display: 'inline-block', padding: '9px 12px', borderRadius: 9, background: theme.text, color: theme.bg, textDecoration: 'none', fontSize: 11, fontWeight: 900 }}>Ver videos recientes ↗</a></article>)}
+      <article style={{ ...panel, gridColumn: isMobile ? 'auto' : '1 / -1' }}><h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Buscar más videos</h3><p style={{ fontSize: 12, color: theme.textMuted }}>Abre YouTube con resultados recientes sobre el tema que quieras estudiar.</p><a href="https://www.youtube.com/results?search_query=ajedrez+clases+analisis+aperturas&sp=CAI%3D" target="_blank" rel="noreferrer" style={{ color: theme.text, fontWeight: 900, fontSize: 12 }}>Explorar videos de ajedrez ↗</a></article>
+    </div>}
+    {tab === 'Tablero libre' && <section style={{...panel,padding:isMobile?10:18}}>
+      <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',flexWrap:'wrap',marginBottom:15}}>
+        <div><div style={{fontSize:10,letterSpacing:'.12em',fontWeight:850,color:theme.textMuted}}>PARTIDA LOCAL · DOS JUGADORES</div><h2 style={{fontSize:19,margin:'5px 0'}}>Tablero de ajedrez</h2><p style={{fontSize:12,color:theme.textMuted}}>Selecciona una pieza y toca una casilla marcada para mover. Las jugadas ilegales se bloquean.</p></div>
+        <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+          <button onClick={undoBoardMove} disabled={!boardHistory.length} style={{padding:'9px 12px',borderRadius:11,border:'1px solid '+theme.cardBorder,background:theme.bg,color:theme.text,opacity:boardHistory.length?1:.4,cursor:boardHistory.length?'pointer':'not-allowed'}}>↶ Deshacer</button>
+          <button onClick={()=>setBoardFlipped(v=>!v)} style={{padding:'9px 12px',borderRadius:11,border:'1px solid '+theme.cardBorder,background:theme.bg,color:theme.text,cursor:'pointer'}}>⇅ Girar</button>
+          <button onClick={resetBoard} style={{padding:'9px 12px',borderRadius:11,border:0,background:theme.text,color:theme.bg,cursor:'pointer'}}>Nueva partida</button>
+        </div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'minmax(0,1fr) 230px',gap:14,alignItems:'start'}}>
+        <div style={{width:'100%',maxWidth:610,margin:'0 auto'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 10px',background:theme.bg,border:'1px solid '+theme.cardBorder,borderBottom:0,borderRadius:'13px 13px 0 0',fontSize:12,fontWeight:800}}><span>♟ Negras</span><span style={{color:boardTurn==='black'?theme.text:'#999'}}>{boardTurn==='black'?'Juegan ahora':''}</span></div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(8,minmax(0,1fr))',border:'1px solid '+theme.cardBorder,overflow:'hidden',aspectRatio:'1',touchAction:'manipulation'}}>
+            {board.map((_,displayIndex)=>{const index=boardFlipped?63-displayIndex:displayIndex;const piece=board[index];const row=Math.floor(index/8),col=index%8,light=(row+col)%2===0;const isTarget=legalTargets.includes(index);const isSelected=selectedSquare===index;return <button key={displayIndex} onClick={()=>movePiece(index)} aria-label={'Casilla '+String.fromCharCode(97+col)+(8-row)+(piece!=='.'?' '+piece:'')} style={{position:'relative',border:0,padding:0,display:'grid',placeItems:'center',aspectRatio:'1',minWidth:0,cursor:'pointer',background:isSelected?'#e7c65c':light?'#eee9df':'#82977b',color:piece===piece.toUpperCase()?'#fff':'#171717',fontSize:'clamp(21px,5vw,48px)',lineHeight:1,textShadow:piece===piece.toUpperCase()?'0 2px 3px rgba(0,0,0,.65)':'0 1px 2px rgba(255,255,255,.65)',boxShadow:isSelected?'inset 0 0 0 3px #a17b23':'none'}}>{CHESS_PIECES[piece]||''}{isTarget&&piece==='.'&&<span style={{position:'absolute',width:'23%',height:'23%',borderRadius:'50%',background:'rgba(28,35,28,.35)'}}/>}{isTarget&&piece!=='.'&&<span style={{position:'absolute',inset:2,border:'3px solid rgba(180,45,45,.72)',borderRadius:'50%',pointerEvents:'none'}}/>}</button>})}
+          </div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 10px',background:theme.bg,border:'1px solid '+theme.cardBorder,borderTop:0,borderRadius:'0 0 13px 13px',fontSize:12,fontWeight:800}}><span>♙ Blancas</span><span style={{color:boardTurn==='white'?theme.text:'#999'}}>{boardTurn==='white'?'Juegan ahora':''}</span></div>
+        </div>
+        <aside style={{display:'grid',gap:10}}>
+          <div style={{padding:13,border:'1px solid '+theme.cardBorder,borderRadius:14,background:theme.bg}}><div style={{fontSize:10,fontWeight:850,letterSpacing:'.1em',color:theme.textMuted}}>ESTADO DE PARTIDA</div><div style={{fontSize:18,fontWeight:850,marginTop:5}}>{boardResult==='mate'?'Jaque mate':boardResult==='stalemate'?'Tablas':boardResult==='check'?'Jaque':boardTurn==='white'?'Turno de blancas':'Turno de negras'}</div><p style={{fontSize:11,color:theme.textMuted,marginTop:7,lineHeight:1.5}}>{boardNotice}</p></div>
+          <div style={{padding:13,border:'1px solid '+theme.cardBorder,borderRadius:14,background:theme.bg}}><div style={{fontSize:10,fontWeight:850,letterSpacing:'.1em',color:theme.textMuted,marginBottom:8}}>MOVIMIENTOS</div><div style={{maxHeight:220,overflowY:'auto',fontSize:12,lineHeight:1.8}}>{boardMoves.length?boardMoves.map((m,i)=><span key={i} style={{display:'inline-block',marginRight:9}}><span style={{color:theme.textMuted}}>{Math.floor(i/2)+1}{i%2===0?'.':''}</span> {m}</span>):<span style={{color:theme.textMuted}}>La partida aún no comienza.</span>}</div></div>
+          <button onClick={()=>{setSelectedSquare(null);setBoardNotice('Seleccion cancelada.')}} style={{padding:10,border:'1px solid '+theme.cardBorder,borderRadius:11,background:theme.card,color:theme.text,cursor:'pointer'}}>Cancelar selección</button>
+          <p style={{fontSize:10,color:theme.textMuted,lineHeight:1.5}}>Incluye movimientos de piezas, peones, captura, protección del rey, jaque, mate y promoción automática a dama. En esta versión no están habilitados el enroque ni la captura al paso.</p>
+        </aside>
+      </div>
+    </section>}
+    {tab === 'Recursos' && <div style={{ display: 'grid', gap: 13 }}>
+      <section style={panel}><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>BIBLIOTECA DE AJEDREZ</div><h2 style={{ fontSize: 19, margin: '5px 0' }}>Libros y material de estudio</h2><p style={{ fontSize: 12, color: theme.textMuted }}>Lecturas abiertas y recursos seleccionados. Los libros se muestran dentro de LifeOS cuando el sitio permite inserción; también puedes abrir la fuente original.</p></section>
+      <section style={panel}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>Biblioteca de lectura</h3>
+        <form onSubmit={e => { e.preventDefault(); if (!resourceTitle.trim() || !resourceUrl.trim()) return; try { const parsed = new URL(resourceUrl.trim()); if (!['https:','http:'].includes(parsed.protocol)) throw new Error(); const item = { id: Date.now(), title: resourceTitle.trim(), url: parsed.toString() }; setReadingResources(prev => [item, ...prev]); setSelectedResourceId(item.id); setResourceTitle(''); setResourceUrl(''); } catch { alert('Ingresa un enlace web válido que comience con https:// o http://'); } }} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.4fr auto', gap: 8 }}>
+          <input value={resourceTitle} onChange={e => setResourceTitle(e.target.value)} placeholder="Nombre del libro o recurso" required style={field}/>
+          <input value={resourceUrl} onChange={e => setResourceUrl(e.target.value)} placeholder="URL de lectura (HTML o visor web)" required style={field}/>
+          <button type="submit" style={{ border: 0, borderRadius: 10, padding: '9px 12px', background: theme.text, color: theme.bg, fontWeight: 900, cursor: 'pointer' }}>Añadir</button>
+        </form>
+        <p style={{ fontSize: 10, color: theme.textMuted, marginTop: 7 }}>Se guardan en este dispositivo y puedes abrirlos aquí si la página permite mostrarse dentro de otra app.</p>
+        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 11 }}>
+          <button onClick={() => setSelectedResourceId(null)} style={{ padding: '8px 10px', borderRadius: 9, border: '1px solid ' + theme.cardBorder, background: selectedResourceId === null ? theme.text : theme.bg, color: selectedResourceId === null ? theme.bg : theme.text, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>Capablanca · Libro clásico</button>
+          {readingResources.map(item => <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 3 }}><button onClick={() => setSelectedResourceId(item.id)} style={{ padding: '8px 10px', borderRadius: 9, border: '1px solid ' + theme.cardBorder, background: selectedResourceId === item.id ? theme.text : theme.bg, color: selectedResourceId === item.id ? theme.bg : theme.text, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{item.title}</button><button onClick={() => { setReadingResources(prev => prev.filter(x => x.id !== item.id)); if (selectedResourceId === item.id) setSelectedResourceId(null); }} title="Eliminar recurso" style={{ border: 0, background: 'transparent', color: theme.textMuted, cursor: 'pointer' }}>×</button></div>)}
+        </div>
+      </section>
+      <section style={{ ...panel, padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: 15 }}><h3 style={{ margin: 0, fontSize: 16 }}>{selectedResourceId === null ? 'Chess Fundamentals — José Raúl Capablanca' : (readingResources.find(x => x.id === selectedResourceId)?.title || 'Recurso')}</h3><p style={{ fontSize: 11, color: theme.textMuted, margin: '5px 0 10px' }}>Lectura integrada. Si el sitio bloquea la inserción, usa el enlace para abrirlo en una pestaña nueva.</p><a href={selectedResourceId === null ? 'https://www.gutenberg.org/ebooks/33870' : (readingResources.find(x => x.id === selectedResourceId)?.url || 'https://www.gutenberg.org/ebooks/33870')} target="_blank" rel="noreferrer" style={{ color: theme.text, fontSize: 12, fontWeight: 900 }}>Abrir fuente original ↗</a></div>
+        <iframe title="Lector de recursos de ajedrez" src={selectedResourceId === null ? 'https://www.gutenberg.org/cache/epub/33870/pg33870-images.html' : (readingResources.find(x => x.id === selectedResourceId)?.url || 'https://www.gutenberg.org/cache/epub/33870/pg33870-images.html')} style={{ width: '100%', height: isMobile ? 560 : 760, border: 0, background: '#fff' }} loading="lazy" />
+      </section>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,minmax(0,1fr))', gap: 12 }}>
+        <article style={panel}><h3 style={{ fontSize: 15, margin: '0 0 6px' }}>Lichess · Learn</h3><p style={{ fontSize: 12, color: theme.textMuted, marginBottom: 10 }}>Lecciones interactivas de reglas, táctica, estrategia y finales.</p><a href="https://lichess.org/learn" target="_blank" rel="noreferrer" style={{ color: theme.text, fontWeight: 900, fontSize: 12 }}>Ir a las lecciones ↗</a></article>
+        <article style={panel}><h3 style={{ fontSize: 15, margin: '0 0 6px' }}>Lichess · Practice</h3><p style={{ fontSize: 12, color: theme.textMuted, marginBottom: 10 }}>Practica mates, clavadas, ataques dobles y otros patrones tácticos.</p><a href="https://lichess.org/practice" target="_blank" rel="noreferrer" style={{ color: theme.text, fontWeight: 900, fontSize: 12 }}>Abrir ejercicios ↗</a></article>
+      </div>
+    </div>}
+    {tab === 'Aperturas' && <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(250px,.8fr) minmax(0,1.2fr)', gap: 12, alignItems: 'start' }}>
+      <form onSubmit={addOpening} style={{ ...panel, display: 'flex', flexDirection: 'column', gap: 9 }}><h2 style={{ fontSize: 16, margin: 0 }}>Nueva apertura / variante</h2><input required value={openingName} onChange={e => setOpeningName(e.target.value)} placeholder="Ej. Defensa Siciliana" style={field}/><select value={openingColor} onChange={e => setOpeningColor(e.target.value)} style={field}><option>Blancas</option><option>Negras</option><option>Ambos colores</option></select><textarea value={openingMoves} onChange={e => setOpeningMoves(e.target.value)} rows={3} placeholder="Movimientos o secuencia (ej. 1. e4 c5 2. Cf3…)" style={{ ...field, resize: 'vertical' }}/><textarea value={openingNotes} onChange={e => setOpeningNotes(e.target.value)} rows={4} placeholder="Planes, ideas, trampas, errores que evitar…" style={{ ...field, resize: 'vertical' }}/><button type="submit" style={{ padding: 11, border: 0, borderRadius: 10, background: theme.text, color: theme.bg, fontWeight: 900, cursor: 'pointer' }}>Guardar en repertorio</button></form>
+      <section style={panel}><h2 style={{ fontSize: 16, margin: '0 0 10px' }}>Mi repertorio · {openings.length}</h2>{openings.length === 0 ? <p style={{ fontSize: 12, color: theme.textMuted, textAlign: 'center', padding: 20 }}>Aún no has guardado aperturas.</p> : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{openings.map(opening => <article key={opening.id} style={{ padding: 12, borderRadius: 11, border: '1px solid ' + theme.cardBorder, background: theme.bg, opacity: opening.done ? .62 : 1 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><div><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>{opening.color.toUpperCase()}</div><h3 style={{ fontSize: 14, margin: '4px 0' }}>{opening.name}</h3></div><button onClick={() => setOpenings(prev => prev.filter(x => x.id !== opening.id))} title="Eliminar" style={{ border: 0, background: 'transparent', color: theme.textMuted, cursor: 'pointer' }}><Trash2 size={15}/></button></div>{opening.moves && <div style={{ fontFamily: 'monospace', fontSize: 12, margin: '7px 0', whiteSpace: 'pre-wrap' }}>{opening.moves}</div>}{opening.notes && <p style={{ fontSize: 12, color: theme.textMuted, whiteSpace: 'pre-wrap', margin: '6px 0' }}>{opening.notes}</p>}<button onClick={() => setOpenings(prev => prev.map(x => x.id === opening.id ? { ...x, done: !x.done } : x))} style={{ marginTop: 7, padding: '7px 10px', borderRadius: 8, border: '1px solid ' + theme.cardBorder, background: opening.done ? theme.card : 'transparent', color: theme.text, fontSize: 10, fontWeight: 900, cursor: 'pointer' }}>{opening.done ? '✓ Apertura aprendida · Marcar pendiente' : 'Marcar como aprendida'}</button></article>)}</div>}</section>
+    </div>}
+    {tab === 'Entrenamiento' && <>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,minmax(0,1fr))', gap: 10, marginBottom: 13 }}>
+        <div style={panel}><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>SESIONES</div><div style={{ fontSize: 26, fontWeight: 900 }}>{chessSessions.length}</div></div>
+        <div style={panel}><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>TIEMPO ENTRENADO</div><div style={{ fontSize: 23, fontWeight: 900 }}>{Math.floor(chessSessions.reduce((s,x)=>s+x.minutes,0)/60)} h {chessSessions.reduce((s,x)=>s+x.minutes,0)%60} min</div></div>
+        <div style={panel}><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>ELO ACTUAL</div><input type="number" min="0" value={chessRating} onChange={e => setChessRating(e.target.value)} placeholder="Opcional" style={{ ...field, marginTop: 5 }}/></div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, alignItems: 'start' }}>
+        <section style={panel}><h2 style={{ fontSize: 16, margin: '0 0 9px' }}><Trophy size={17} style={{ display: 'inline', verticalAlign: '-3px' }}/> Mi objetivo</h2><textarea value={chessGoal} onChange={e => setChessGoal(e.target.value)} rows={3} style={{ ...field, resize: 'vertical' }}/><div style={{ fontSize: 12, fontWeight: 900, margin: '14px 0 8px' }}>Áreas de entrenamiento</div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>{['Táctica','Aperturas','Estrategia','Finales','Cálculo','Análisis de partidas'].map(x => <div key={x} style={{ padding: 10, borderRadius: 9, background: theme.bg, border: '1px solid ' + theme.cardBorder, fontSize: 11, fontWeight: 800 }}>{x}</div>)}</div></section>
+        <section style={panel}><h2 style={{ fontSize: 16, margin: '0 0 10px' }}>Registrar entrenamiento</h2><form onSubmit={e => { e.preventDefault(); const mins = Math.max(1, Math.min(600, Number(chessMinutes) || 30)); setChessSessions(prev => [{ id: Date.now(), date: new Date().toISOString().slice(0,10), minutes: mins, focus: chessFocus, notes: chessNotes.trim() }, ...prev]); setChessNotes(''); }} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><select value={chessFocus} onChange={e => setChessFocus(e.target.value)} style={field}>{['Táctica','Aperturas','Estrategia','Finales','Cálculo','Análisis de partidas','Partida rápida','Partida clásica'].map(x => <option key={x}>{x}</option>)}</select><input type="number" min="1" max="600" value={chessMinutes} onChange={e => setChessMinutes(e.target.value)} style={field}/><textarea rows={3} value={chessNotes} onChange={e => setChessNotes(e.target.value)} placeholder="¿Qué aprendiste? ¿Qué quieres repasar?" style={{ ...field, resize: 'vertical' }}/><button type="submit" style={{ padding: 11, border: 0, borderRadius: 10, background: theme.text, color: theme.bg, fontWeight: 900, cursor: 'pointer' }}>Guardar sesión</button></form></section>
+      </div>
+      <section style={{ ...panel, marginTop: 13 }}><h2 style={{ fontSize: 16, margin: '0 0 10px' }}>Bitácora de entrenamiento</h2>{chessSessions.length === 0 ? <p style={{ fontSize: 12, color: theme.textMuted }}>Todavía no hay sesiones registradas.</p> : chessSessions.map(session => <article key={session.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: 10, borderBottom: '1px solid ' + theme.cardBorder }}><div><b style={{ fontSize: 12 }}>{session.focus} · {session.minutes} min</b><div style={{ fontSize: 10, color: theme.textMuted }}>{session.date}</div>{session.notes && <p style={{ fontSize: 12, color: theme.textMuted, whiteSpace: 'pre-wrap' }}>{session.notes}</p>}</div><button onClick={() => setChessSessions(prev => prev.filter(x => x.id !== session.id))} style={{ border: 0, background: 'transparent', color: theme.textMuted, cursor: 'pointer' }}><Trash2 size={15}/></button></article>)}</section>
+    </>}
+  </div>;
+}
 
 
 function DashboardMiniLine({ data, theme }: { data: MoneyPoint[]; theme: any }) {
@@ -835,8 +1236,12 @@ export default function App() {
     }
   });
 
-  const [activeTab, setActiveTab] = useState<'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes'>(() => { try { return (sessionStorage.getItem('lifeos_ui_active_tab') as any) || 'inicio'; } catch { return 'inicio'; } });
-  const [studySubTab, setStudySubTab] = useState<'semestre' | 'materias' | 'malla' | 'horario' | 'calendario' | 'historial'>(() => { try { return (sessionStorage.getItem('lifeos_ui_study_tab') as any) || 'materias'; } catch { return 'materias'; } });
+  useEffect(() => {
+    document.documentElement.dataset.lifeosTheme = darkMode ? 'dark' : 'light';
+  }, [darkMode]);
+
+  const [activeTab, setActiveTab] = useState<LifeOSTab>(() => { try { return (sessionStorage.getItem('lifeos_ui_active_tab') as LifeOSTab) || 'inicio'; } catch { return 'inicio'; } });
+  const [studySubTab, setStudySubTab] = useState<'semestre' | 'materias' | 'malla' | 'horario' | 'calendario' | 'historial' | 'flashcards'>(() => { try { return (sessionStorage.getItem('lifeos_ui_study_tab') as any) || 'materias'; } catch { return 'materias'; } });
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [todoFilter, setTodoFilter] = useState<'Todas' | 'Pendientes' | 'Completadas'>('Todas');
   const [habitSubTab, setHabitSubTab] = useState<'dia' | 'semana' | 'mes'>(() => { try { return (sessionStorage.getItem('lifeos_ui_habit_tab') as any) || 'dia'; } catch { return 'dia'; } });
@@ -853,6 +1258,7 @@ export default function App() {
       if (!AudioCtx) return;
       if (!audioContextRef.current) audioContextRef.current = new AudioCtx();
       const ctx = audioContextRef.current;
+      if (!ctx) return;
       if (ctx.state === 'suspended') void ctx.resume();
       const now = ctx.currentTime;
       const osc = ctx.createOscillator();
@@ -1254,6 +1660,28 @@ export default function App() {
     return [];
   });
 
+  // Centro de ayudantías: ramos, proyectos, ideas, fórmulas, reuniones y tareas.
+  const [assistantEntries, setAssistantEntries] = useState<AssistantEntry[]>(() => {
+    try { return JSON.parse(localStorage.getItem('lifeos_assistant_entries') || '[]'); } catch { return []; }
+  });
+  const [assistantType, setAssistantType] = useState<AssistantEntryType>('Proyecto');
+  const [assistantTitle, setAssistantTitle] = useState('');
+  const [assistantCourse, setAssistantCourse] = useState('');
+  const [assistantContent, setAssistantContent] = useState('');
+  const [assistantDate, setAssistantDate] = useState('');
+  const [assistantWeight, setAssistantWeight] = useState('');
+  const [assistantFilter, setAssistantFilter] = useState<'Todos' | AssistantEntryType>('Todos');
+
+  // Espacio inicial de entrenamiento de ajedrez.
+  const [chessSessions, setChessSessions] = useState<ChessSession[]>(() => {
+    try { return JSON.parse(localStorage.getItem('lifeos_chess_sessions') || '[]'); } catch { return []; }
+  });
+  const [chessGoal, setChessGoal] = useState(() => localStorage.getItem('lifeos_chess_goal') || 'Jugar partidas más sólidas y analizar mis errores.');
+  const [chessRating, setChessRating] = useState(() => localStorage.getItem('lifeos_chess_rating') || '');
+  const [chessMinutes, setChessMinutes] = useState('30');
+  const [chessFocus, setChessFocus] = useState('Táctica');
+  const [chessNotes, setChessNotes] = useState('');
+
   // Sincronización en la nube
   const [cloudSession, setCloudSession] = useState<LifeOSCloudSession | null>(() => getStoredCloudSession());
   const [cloudEmail, setCloudEmail] = useState('');
@@ -1299,6 +1727,10 @@ export default function App() {
       localStorage.setItem('lifeos_habits', JSON.stringify(habits));
       localStorage.setItem('lifeos_academic_tasks', JSON.stringify(academicTasks));
       localStorage.setItem('lifeos_personal_todos', JSON.stringify(personalTodos));
+      localStorage.setItem('lifeos_assistant_entries', JSON.stringify(assistantEntries));
+      localStorage.setItem('lifeos_chess_sessions', JSON.stringify(chessSessions));
+      localStorage.setItem('lifeos_chess_goal', chessGoal);
+      localStorage.setItem('lifeos_chess_rating', chessRating);
       localStorage.setItem('lifeos_shopping_items', JSON.stringify(shoppingItems));
       localStorage.setItem('lifeos_habit_log', JSON.stringify(habitLog));
       localStorage.setItem('lifeos_notifications_enabled', String(notificationsEnabled));
@@ -1315,7 +1747,7 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
-  }, [darkMode, studentName, currentSemesterName, careerName, careerYears, currentSemesterNumber, dashboardAccountFilter, dashboardBackground, soundsEnabled, semStartDate, semEndDate, semesterDateConfig, academicBreaks, bookmarks, curriculum, spotifyEmbedUrl, musicWidgetEnabled, sesTestPeriod, sesUseAutomaticPeriod, sesScheduleRoomChoices, sesScheduleSectionChoices, sesScheduleBackup, sesClassNotificationsEnabled, accountsList, transactions, savingGoals, subjects, archivedSemesters, habits, habitLog, academicTasks, personalTodos, shoppingItems, notificationsEnabled, emailCenterEnabled, emailAddress, emailDailyEnabled, emailDailyTime, emailClassEnabled, emailClassMinutes, emailEvaluationEnabled, emailEvaluationOffsets, emailSesChangesEnabled]);
+  }, [darkMode, studentName, currentSemesterName, careerName, careerYears, currentSemesterNumber, dashboardAccountFilter, dashboardBackground, soundsEnabled, semStartDate, semEndDate, semesterDateConfig, academicBreaks, bookmarks, curriculum, spotifyEmbedUrl, musicWidgetEnabled, sesTestPeriod, sesUseAutomaticPeriod, sesScheduleRoomChoices, sesScheduleSectionChoices, sesScheduleBackup, sesClassNotificationsEnabled, accountsList, transactions, savingGoals, subjects, archivedSemesters, habits, habitLog, academicTasks, personalTodos, assistantEntries, chessSessions, chessGoal, chessRating, shoppingItems, notificationsEnabled, emailCenterEnabled, emailAddress, emailDailyEnabled, emailDailyTime, emailClassEnabled, emailClassMinutes, emailEvaluationEnabled, emailEvaluationOffsets, emailSesChangesEnabled]);
 
   // v25: limpia exclusivamente los datos SES de prueba 2026-2 y deja LifeOS listo para 2027-1.
   useEffect(() => {
@@ -1841,7 +2273,7 @@ export default function App() {
     else action();
   };
 
-  const navigateTab = (tab: 'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes') => runViewTransition(() => { try { sessionStorage.setItem('lifeos_ui_active_tab', tab); } catch {} setActiveTab(tab); });
+  const navigateTab = (tab: LifeOSTab) => runViewTransition(() => { try { sessionStorage.setItem('lifeos_ui_active_tab', tab); } catch {} setActiveTab(tab); });
   const navigateStudyTab = (tab: 'semestre' | 'materias' | 'malla' | 'horario' | 'calendario' | 'historial') => runViewTransition(() => { try { sessionStorage.setItem('lifeos_ui_study_tab', tab); } catch {} setStudySubTab(tab); });
 
   useEffect(() => { try { sessionStorage.setItem('lifeos_ui_active_tab', activeTab); } catch {} }, [activeTab]);
@@ -2175,21 +2607,22 @@ export default function App() {
     const allowedDays = new Set(['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']);
 
     sesScheduleSubjectSummaries.forEach(summary => {
-      if (summary.selectedSection === null) return;
-      summary.rows.filter(row => Number(row.CURS_SECCION) === summary.selectedSection).forEach(row => {
+      const selectedSection = summary.selectedSection;
+      if (selectedSection === null) return;
+      summary.rows.filter(row => Number(row.CURS_SECCION) === selectedSection).forEach(row => {
         const day = String(row.HOR_DIA || '').trim();
         const startTime = validSesClock(row.HOR_H_INI);
         const endTime = validSesClock(row.HOR_H_FIN);
         const courseCode = Number(row.CURS_CODIGO);
         if (!allowedDays.has(day) || !startTime || !endTime || !Number.isFinite(courseCode)) return;
         const room = String(row.SAL_NOMBRE || '').trim() || 'Sala por confirmar';
-        const key = `${summary.subject.id}|${courseCode}|${summary.selectedSection}|${day}|${startTime}|${endTime}`;
+        const key = `${summary.subject.id}|${courseCode}|${selectedSection}|${day}|${startTime}|${endTime}`;
         const existing = exactSlots.get(key);
         if (existing) existing.rooms.add(room);
         else exactSlots.set(key, {
           subject: summary.subject,
           courseCode,
-          section: summary.selectedSection,
+          section: selectedSection,
           day: day as ScheduleBlock['day'],
           startTime,
           endTime,
@@ -2774,7 +3207,7 @@ export default function App() {
     setNumControles(String(evs.filter(e=>e.type==='control').length)); setWeightControles(String(evs.find(e=>e.type==='control')?.weight || 0));
     setNumTrabajos(String(evs.filter(e=>e.type==='trabajo').length)); setWeightTrabajos(String(evs.find(e=>e.type==='trabajo')?.weight || 0));
     setHasExemption(sub.hasExemption); setExemptionGrade(String(sub.exemptionGrade)); setExamWeight(String(sub.examWeight)); setIsExamFailingRule(sub.isExamFailingRule); setMinGradeForOneOpportunity(String(sub.minGradeForOneOpportunity)); setMinGradeForTwoOpportunities(String(sub.minGradeForTwoOpportunities));
-    setSubBlocks((sub.scheduleBlocks.length ? sub.scheduleBlocks : [{day:'Lunes',startTime:'08:30',endTime:'10:00'}]).map(b=>({day:b.day,startTime:b.startTime,endTime:b.endTime})));
+    setSubBlocks((sub.scheduleBlocks.length ? sub.scheduleBlocks : [{day:'Lunes' as ScheduleBlock['day'],startTime:'08:30',endTime:'10:00'}]).map(b=>({day:b.day,startTime:b.startTime,endTime:b.endTime})));
     setShowSubjectModal(true);
   };
 
@@ -3045,7 +3478,7 @@ export default function App() {
   return (
     <>
       <style>{LIFEOS_V9_CSS}</style>
-      <div style={{ '--lifeos-card-bg': theme.card, '--lifeos-card-border': theme.cardBorder, '--lifeos-text': theme.text, '--lifeos-muted': theme.textMuted, '--lifeos-card': theme.card, display: 'flex', minHeight: '100vh', backgroundColor: theme.bg, color: theme.text, fontFamily: 'system-ui, -apple-system, sans-serif' } as React.CSSProperties}>
+      <div className="lifeos-app-shell" data-lifeos-theme={darkMode ? 'dark' : 'light'} style={{ '--lifeos-card-bg': theme.card, '--lifeos-card-border': theme.cardBorder, '--lifeos-text': theme.text, '--lifeos-muted': theme.textMuted, '--lifeos-card': theme.card, display: 'flex', minHeight: '100vh', backgroundColor: theme.bg, color: theme.text, fontFamily: 'system-ui, -apple-system, sans-serif' } as React.CSSProperties}>
       
       {/* SIDEBAR COLAPSABLE */}
       <aside style={{
@@ -3085,13 +3518,17 @@ export default function App() {
               { id: 'todos', label: 'To-Do List', icon: <ListTodo size={19} />, badge: pendingTodos },
               { id: 'calendario', label: 'Calendario Maestro', icon: <CalendarDays size={19} /> },
               { id: 'enlaces', label: 'Vault / Enlaces', icon: <Bookmark size={19} /> },
+              { id: 'ayudante', label: 'Ayudante', icon: <ClipboardList size={19} /> },
+              { id: 'ingles', label: 'English', icon: <BookOpen size={19} /> },
+              { id: 'creadores', label: 'Contenido & redes', icon: <Image size={19} /> }, 
+              { id: 'ajedrez', label: 'Ajedrez', icon: <Puzzle size={19} /> },
               { id: 'ajustes', label: 'Configuración', icon: <Settings size={19} /> }
             ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => {
                   setSelectedAccountId(null);
-                  navigateTab(tab.id as 'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes');
+                  navigateTab(tab.id as LifeOSTab);
                   if (isMobile) setSidebarOpen(false);
                 }}
                 style={{
@@ -3151,14 +3588,19 @@ export default function App() {
       )}
 
       {/* CONTENIDO PRINCIPAL */}
-      <main className="lifeos-main lifeos-page-transition" style={{ flex: 1, padding: isMobile ? '12px' : '22px 30px', overflowY: 'auto', maxWidth: '100vw' }}>
+      <main className="lifeos-main lifeos-page-transition" style={{ flex: 1, padding: isMobile ? '12px' : '22px 30px', overflowY: 'auto', maxWidth: 'none', minWidth: 0, width: '100%' }}>
         {isMobile && (
           <div className="lifeos-mobile-only lifeos-mobile-header" style={{ display: 'none', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', paddingBottom: '8px', borderBottom: `1px solid ${theme.cardBorder}` }}>
             <div style={{display:'flex',alignItems:'center',gap:10}}>
               <div style={{width:36,height:36,borderRadius:11,backgroundColor:theme.primary,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900}}>⚗</div>
               <div><div style={{fontSize:15,fontWeight:900}}>Life<span style={{color:theme.primary}}>OS</span></div><div style={{fontSize:10,color:theme.textMuted}}>{currentSemesterName}</div></div>
             </div>
-            <button onClick={()=>setSidebarOpen(true)} aria-label="Abrir navegación" style={{width:40,height:40,padding:0,border:`1px solid ${theme.cardBorder}`,backgroundColor:theme.card,color:theme.text,display:'flex',alignItems:'center',justifyContent:'center'}}><Menu size={19}/></button>
+            <div style={{display:'flex',alignItems:'center',gap:7}}>
+              <button onClick={()=>setDarkMode(!darkMode)} aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'} title={darkMode ? 'Modo claro' : 'Modo oscuro'} style={{width:40,height:40,padding:0,border:`1px solid ${theme.cardBorder}`,backgroundColor:theme.card,color:theme.text,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:12}}>
+                {darkMode ? <Sun size={18}/> : <Moon size={18}/>}
+              </button>
+              <button onClick={()=>setSidebarOpen(true)} aria-label="Abrir navegación" style={{width:40,height:40,padding:0,border:`1px solid ${theme.cardBorder}`,backgroundColor:theme.card,color:theme.text,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:12}}><Menu size={19}/></button>
+            </div>
           </div>
         )}
         
@@ -3408,7 +3850,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* 1. SUB-TAB: SEMESTRE */}
+            <button onClick={() => setStudySubTab('flashcards')} style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', background: studySubTab === 'flashcards' ? theme.primary : theme.card, color: studySubTab === 'flashcards' ? '#fff' : theme.textMuted, fontWeight: '700', fontSize: '12px', whiteSpace: 'nowrap', cursor: 'pointer' }}>Flashcards</button>
+              {/* 1. SUB-TAB: SEMESTRE */}
             {studySubTab === 'semestre' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', padding: '22px' }}>
@@ -3886,6 +4329,7 @@ export default function App() {
                 ))}
               </div>
             )}
+            {studySubTab === 'flashcards' && <FlashcardsWorkspace theme={theme} isMobile={isMobile} />}
           </div>
         )}
 
@@ -4390,6 +4834,32 @@ export default function App() {
           </div>
         )}
 
+
+
+        {/* ================= VISTA: AYUDANTE ================= */}
+        {activeTab === 'ayudante' && <AssistantWorkspace theme={theme} isMobile={isMobile} />}
+
+        {/* ================= VISTA: AJEDREZ ================= */}
+        {activeTab === 'ajedrez' && (
+          <ChessWorkspace
+            theme={theme}
+            isMobile={isMobile}
+            chessSessions={chessSessions}
+            setChessSessions={setChessSessions}
+            chessGoal={chessGoal}
+            setChessGoal={setChessGoal}
+            chessRating={chessRating}
+            setChessRating={setChessRating}
+            chessMinutes={chessMinutes}
+            setChessMinutes={setChessMinutes}
+            chessFocus={chessFocus}
+            setChessFocus={setChessFocus}
+            chessNotes={chessNotes}
+            setChessNotes={setChessNotes}
+          />
+        )}
+        {activeTab === 'ingles' && <EnglishWorkspace theme={theme} isMobile={isMobile} />}
+        {activeTab === 'creadores' && <CreatorProjectsWorkspace theme={theme} isMobile={isMobile} />}
         {/* ================= VISTA: ENLACES ================= */}
         {activeTab === 'enlaces' && (
           <div>
@@ -4435,6 +4905,20 @@ export default function App() {
         {/* ================= VISTA: CONFIGURACIÓN ================= */}
         {activeTab === 'ajustes' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '540px' }}>
+            <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <h1 style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}>Apariencia</h1>
+                <p style={{ fontSize: '12px', color: theme.textMuted, marginTop: 5 }}>Elige cómo quieres ver LifeOS. Tu preferencia queda guardada.</p>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <button type="button" onClick={() => setDarkMode(false)} aria-pressed={!darkMode} style={{ display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'12px 10px',border:`1px solid ${!darkMode ? theme.text : theme.cardBorder}`,borderRadius:13,background:!darkMode?theme.activeTab:'transparent',color:theme.text,fontWeight:800,cursor:'pointer' }}>
+                  <Sun size={17}/> Claro
+                </button>
+                <button type="button" onClick={() => setDarkMode(true)} aria-pressed={darkMode} style={{ display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'12px 10px',border:`1px solid ${darkMode ? theme.text : theme.cardBorder}`,borderRadius:13,background:darkMode?theme.activeTab:'transparent',color:theme.text,fontWeight:800,cursor:'pointer' }}>
+                  <Moon size={17}/> Oscuro
+                </button>
+              </div>
+            </div>
             <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <h1 style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}>Perfil y Carrera ⚙️</h1>
               <div>
