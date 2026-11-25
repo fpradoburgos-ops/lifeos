@@ -1093,6 +1093,7 @@ function ChessWorkspace(props: {
   const panel = { background: theme.card, border: '1px solid ' + theme.cardBorder, borderRadius: 17, padding: 16 };
   const field = { width: '100%', boxSizing: 'border-box' as const, padding: 10, borderRadius: 10, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, font: 'inherit' };
   const movePiece = (index: number) => {
+    if(boardResult==='mate'||boardResult==='stalemate'){setBoardNotice('La partida terminó. Pulsa Nueva partida para comenzar otra.');return;}
     if (selectedSquare===null) {
       if(chessSideOf(board[index])===boardTurn){setSelectedSquare(index);setBoardNotice('Destinos legales resaltados. Elige una casilla.');}
       else setBoardNotice(board[index]==='.'?'Selecciona una de tus piezas.':'Es el turno de '+(boardTurn==='white'?'las blancas':'las negras')+'.');
