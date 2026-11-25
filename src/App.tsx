@@ -858,7 +858,7 @@ const LIFEOS_V9_CSS = `
 type AssistantCourseSection = 'Recursos a presentar' | 'Recursos a crear' | 'Ponderaciones' | 'Próximas evaluaciones' | 'Reuniones' | 'Clases a impartir' | 'Apuntes';
 type AssistantCourseItem = { id: number; section: AssistantCourseSection; title: string; detail: string; date: string; weight: string; done: boolean };
 type AssistantCourse = { id: number; name: string; code: string; description: string; items: AssistantCourseItem[] };
-type ChessOpeningNote = { id: number; name: string; color: string; moves: string; notes: string; done: boolean };
+
 
 const ASSISTANT_SECTIONS: AssistantCourseSection[] = ['Recursos a presentar','Recursos a crear','Ponderaciones','Próximas evaluaciones','Reuniones','Clases a impartir','Apuntes'];
 
