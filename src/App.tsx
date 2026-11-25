@@ -1018,6 +1018,60 @@ function AssistantWorkspace({ theme, isMobile }: { theme: any; isMobile: boolean
 const CHESS_PIECES: Record<string, string> = { 'K':'♔','Q':'♕','R':'♖','B':'♗','N':'♘','P':'♙','k':'♚','q':'♛','r':'♜','b':'♝','n':'♞','p':'♟' };
 const START_CHESS_BOARD = 'rnbqkbnrpppppppp................................PPPPPPPPRNBQKBNR'.split('');
 
+type ChessSide = 'white' | 'black';
+const chessSideOf = (piece:string):ChessSide | null => !piece || piece==='.' ? null : piece===piece.toUpperCase() ? 'white' : 'black';
+const chessInside = (r:number,c:number) => r>=0 && r<8 && c>=0 && c<8;
+const chessFindKing = (board:string[],side:ChessSide) => board.findIndex(p=>p===(side==='white'?'K':'k'));
+const chessAttacked = (board:string[],target:number,by:ChessSide):boolean => {
+  const tr=Math.floor(target/8),tc=target%8;
+  for(let i=0;i<64;i++){
+    const p=board[i]; if(p==='.' || chessSideOf(p)!==by) continue;
+    const r=Math.floor(i/8),c=i%8,dr=tr-r,dc=tc-c,kind=p.toLowerCase();
+    if(kind==='p'){const dir=by==='white'?-1:1;if(dr===dir&&Math.abs(dc)===1)return true;continue;}
+    if(kind==='n'&&((Math.abs(dr)===2&&Math.abs(dc)===1)||(Math.abs(dr)===1&&Math.abs(dc)===2)))return true;
+    if(kind==='k'&&Math.max(Math.abs(dr),Math.abs(dc))===1)return true;
+    const diagonal=Math.abs(dr)===Math.abs(dc)&&dr!==0;
+    const straight=(dr===0&&dc!==0)||(dc===0&&dr!==0);
+    if((kind==='b'&&diagonal)||(kind==='r'&&straight)||(kind==='q'&&(diagonal||straight))){
+      const sr=Math.sign(dr),sc=Math.sign(dc);let rr=r+sr,cc=c+sc,clear=true;
+      while(rr!==tr||cc!==tc){if(board[rr*8+cc]!=='.'){clear=false;break;}rr+=sr;cc+=sc;}
+      if(clear)return true;
+    }
+  }
+  return false;
+};
+const chessInCheck = (board:string[],side:ChessSide):boolean => {
+  const king=chessFindKing(board,side);
+  return king<0 ? false : chessAttacked(board,king,side==='white'?'black':'white');
+};
+const chessPseudoMove = (board:string[],from:number,to:number,side:ChessSide):boolean => {
+  if(from===to)return false;
+  const p=board[from],target=board[to];if(p==='.'||chessSideOf(p)!==side||chessSideOf(target)===side||target.toLowerCase()==='k')return false;
+  const r=Math.floor(from/8),c=from%8,tr=Math.floor(to/8),tc=to%8,dr=tr-r,dc=tc-c,kind=p.toLowerCase();
+  if(kind==='p'){
+    const dir=side==='white'?-1:1,start=side==='white'?6:1;
+    if(dc===0&&dr===dir&&target==='.')return true;
+    if(dc===0&&r===start&&dr===2*dir&&target==='.'&&board[(r+dir)*8+c]==='.')return true;
+    return Math.abs(dc)===1&&dr===dir&&target!=='.'&&chessSideOf(target)!==side;
+  }
+  if(kind==='n')return (Math.abs(dr)===2&&Math.abs(dc)===1)||(Math.abs(dr)===1&&Math.abs(dc)===2);
+  if(kind==='k')return Math.max(Math.abs(dr),Math.abs(dc))===1;
+  const diagonal=Math.abs(dr)===Math.abs(dc)&&dr!==0,straight=(dr===0&&dc!==0)||(dc===0&&dr!==0);
+  if(!((kind==='b'&&diagonal)||(kind==='r'&&straight)||(kind==='q'&&(diagonal||straight))))return false;
+  const sr=Math.sign(dr),sc=Math.sign(dc);let rr=r+sr,cc=c+sc;
+  while(rr!==tr||cc!==tc){if(board[rr*8+cc]!=='.')return false;rr+=sr;cc+=sc;}
+  return true;
+};
+const chessLegalMove = (board:string[],from:number,to:number,side:ChessSide):boolean => {
+  if(!chessPseudoMove(board,from,to,side))return false;
+  const next=[...board];next[to]=next[from];next[from]='.';
+  if(next[to].toLowerCase()==='p'&&(Math.floor(to/8)===0||Math.floor(to/8)===7))next[to]=side==='white'?'Q':'q';
+  return !chessInCheck(next,side);
+};
+const chessLegalDestinations = (board:string[],from:number,side:ChessSide):number[] => Array.from({length:64},(_,i)=>i).filter(to=>chessLegalMove(board,from,to,side));
+const chessHasLegalMove = (board:string[],side:ChessSide):boolean => board.some((p,from)=>chessSideOf(p)===side&&chessLegalDestinations(board,from,side).length>0);
+
+
 function ChessWorkspace(props: {
   theme: any; isMobile: boolean; chessSessions: ChessSession[]; setChessSessions: React.Dispatch<React.SetStateAction<ChessSession[]>>;
   chessGoal: string; setChessGoal: (value: string) => void; chessRating: string; setChessRating: (value: string) => void;
@@ -1029,7 +1083,12 @@ function ChessWorkspace(props: {
   const [board, setBoard] = useState<string[]>(() => [...START_CHESS_BOARD]);
   const [selectedSquare, setSelectedSquare] = useState<number | null>(null);
   const [boardFlipped, setBoardFlipped] = useState(false);
-  const [boardHistory, setBoardHistory] = useState<string[][]>([]);
+  const [boardHistory, setBoardHistory] = useState<{board:string[];turn:ChessSide;move:string}[]>([]);
+  const [boardTurn,setBoardTurn] = useState<ChessSide>('white');
+  const [boardMoves,setBoardMoves] = useState<string[]>([]);
+  const [boardNotice,setBoardNotice] = useState('Blancas comienzan. Selecciona una pieza para ver sus movimientos legales.');
+  const [boardResult,setBoardResult] = useState<'playing'|'check'|'mate'|'stalemate'>('playing');
+  const legalTargets = selectedSquare===null ? [] : chessLegalDestinations(board,selectedSquare,boardTurn);
   const [openings, setOpenings] = useState<ChessOpeningNote[]>(() => { try { return JSON.parse(localStorage.getItem('lifeos_chess_openings') || '[]'); } catch { return []; } });
   const [openingName, setOpeningName] = useState('');
   const [openingColor, setOpeningColor] = useState('Blancas');
@@ -1044,15 +1103,28 @@ function ChessWorkspace(props: {
   const panel = { background: theme.card, border: '1px solid ' + theme.cardBorder, borderRadius: 17, padding: 16 };
   const field = { width: '100%', boxSizing: 'border-box' as const, padding: 10, borderRadius: 10, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, font: 'inherit' };
   const movePiece = (index: number) => {
-    if (selectedSquare === null) {
-      if (board[index] !== '.') setSelectedSquare(index);
+    if (selectedSquare===null) {
+      if(chessSideOf(board[index])===boardTurn){setSelectedSquare(index);setBoardNotice('Destinos legales resaltados. Elige una casilla.');}
+      else setBoardNotice(board[index]==='.'?'Selecciona una de tus piezas.':'Es el turno de '+(boardTurn==='white'?'las blancas':'las negras')+'.');
       return;
     }
-    if (selectedSquare === index) { setSelectedSquare(null); return; }
-    setBoardHistory(prev => [...prev, [...board]]);
-    setBoard(prev => { const next = [...prev]; next[index] = next[selectedSquare]; next[selectedSquare] = '.'; return next; });
-    setSelectedSquare(null);
+    if(index===selectedSquare){setSelectedSquare(null);setBoardNotice('Selección cancelada.');return;}
+    if(chessSideOf(board[index])===boardTurn){setSelectedSquare(index);setBoardNotice('Pieza seleccionada. Elige uno de los destinos resaltados.');return;}
+    if(!chessLegalMove(board,selectedSquare,index,boardTurn)){setBoardNotice('Movimiento ilegal: esa casilla no es un destino válido o dejaría a tu rey en jaque.');return;}
+    const from=selectedSquare, moving=board[from], next=[...board];next[index]=moving;next[from]='.';
+    const promotion=moving.toLowerCase()==='p'&&(Math.floor(index/8)===0||Math.floor(index/8)===7);
+    if(promotion)next[index]=boardTurn==='white'?'Q':'q';
+    const notation=String.fromCharCode(97+(from%8))+(8-Math.floor(from/8))+'–'+String.fromCharCode(97+(index%8))+(8-Math.floor(index/8))+(promotion?'=Q':'');
+    const nextTurn:ChessSide=boardTurn==='white'?'black':'white';
+    const check=chessInCheck(next,nextTurn),hasMoves=chessHasLegalMove(next,nextTurn);
+    setBoardHistory(prev=>[...prev,{board:[...board],turn:boardTurn,move:notation}]);
+    setBoard(next);setBoardTurn(nextTurn);setBoardMoves(prev=>[...prev,notation]);setSelectedSquare(null);
+    if(!hasMoves){setBoardResult(check?'mate':'stalemate');setBoardNotice(check?'Jaque mate. Partida terminada.':'Tablas por ahogado. Partida terminada.');}
+    else if(check){setBoardResult('check');setBoardNotice('¡Jaque! Juegan '+(nextTurn==='white'?'las blancas':'las negras')+'.');}
+    else {setBoardResult('playing');setBoardNotice('Juegan '+(nextTurn==='white'?'las blancas':'las negras')+'.');}
   };
+  const undoBoardMove=()=>{const last=boardHistory[boardHistory.length-1];if(!last)return;setBoard(last.board);setBoardTurn(last.turn);setBoardHistory(prev=>prev.slice(0,-1));setBoardMoves(prev=>prev.slice(0,-1));setSelectedSquare(null);setBoardResult('playing');setBoardNotice('Último movimiento deshecho.');};
+  const resetBoard=()=>{setBoard([...START_CHESS_BOARD]);setBoardHistory([]);setBoardTurn('white');setBoardMoves([]);setSelectedSquare(null);setBoardFlipped(false);setBoardResult('playing');setBoardNotice('Nueva partida. Juegan las blancas.');};
   const addOpening = (event: React.FormEvent) => {
     event.preventDefault();
     if (!openingName.trim()) return;
@@ -1068,17 +1140,30 @@ function ChessWorkspace(props: {
       {[{name:'Ajedrez Magistral',query:'Ajedrez Magistral ajedrez',desc:'Clases, ideas y contenido de ajedrez en español.'},{name:'Rey Enigma',query:'Rey Enigma ajedrez',desc:'Videos, partidas y retos de ajedrez.'}].map(channel => <article key={channel.name} style={panel}><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>CANAL DE YOUTUBE</div><h3 style={{ margin: '6px 0', fontSize: 17 }}>{channel.name}</h3><p style={{ fontSize: 12, color: theme.textMuted }}>{channel.desc}</p><a href={'https://www.youtube.com/results?search_query=' + encodeURIComponent(channel.query) + '&sp=CAI%3D'} target="_blank" rel="noreferrer" style={{ display: 'inline-block', padding: '9px 12px', borderRadius: 9, background: theme.text, color: theme.bg, textDecoration: 'none', fontSize: 11, fontWeight: 900 }}>Ver videos recientes ↗</a></article>)}
       <article style={{ ...panel, gridColumn: isMobile ? 'auto' : '1 / -1' }}><h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Buscar más videos</h3><p style={{ fontSize: 12, color: theme.textMuted }}>Abre YouTube con resultados recientes sobre el tema que quieras estudiar.</p><a href="https://www.youtube.com/results?search_query=ajedrez+clases+analisis+aperturas&sp=CAI%3D" target="_blank" rel="noreferrer" style={{ color: theme.text, fontWeight: 900, fontSize: 12 }}>Explorar videos de ajedrez ↗</a></article>
     </div>}
-    {tab === 'Tablero libre' && <section style={panel}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}><div><h2 style={{ fontSize: 17, margin: 0 }}>Tablero de práctica libre</h2><p style={{ fontSize: 11, color: theme.textMuted, margin: '4px 0 0' }}>Mueve cualquier pieza a cualquier casilla. Sin turnos, reloj ni reglas.</p></div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <button onClick={() => { setBoardHistory(prev => [...prev, [...board]]); setBoard(Array(64).fill('.')); setSelectedSquare(null); }} style={{ padding: '8px 10px', borderRadius: 9, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, cursor: 'pointer', fontWeight: 800 }}>Vaciar</button>
-        <button disabled={!boardHistory.length} onClick={() => { const previous = boardHistory[boardHistory.length - 1]; setBoard(previous); setBoardHistory(prev => prev.slice(0, -1)); setSelectedSquare(null); }} style={{ padding: '8px 10px', borderRadius: 9, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, cursor: boardHistory.length ? 'pointer' : 'not-allowed', opacity: boardHistory.length ? 1 : .45, fontWeight: 800 }}>↶ Deshacer</button>
-        <button onClick={() => setBoardFlipped(v => !v)} style={{ padding: '8px 10px', borderRadius: 9, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, cursor: 'pointer', fontWeight: 800 }}>⇅ Girar</button>
-        <button onClick={() => { setBoard([...START_CHESS_BOARD]); setBoardHistory([]); setSelectedSquare(null); setBoardFlipped(false); }} style={{ padding: '8px 10px', borderRadius: 9, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, cursor: 'pointer', fontWeight: 800 }}>Reiniciar</button>
-      </div></div>
-      <div style={{ width: '100%', maxWidth: 560, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(8,minmax(0,1fr))', border: '5px solid ' + (theme.cardBorder), borderRadius: 13, overflow: 'hidden', aspectRatio: '1', boxShadow: '0 12px 30px rgba(0,0,0,.12)' }}>
-        {board.map((_,displayIndex) => { const index = boardFlipped ? 63 - displayIndex : displayIndex; const piece = board[index]; const row = Math.floor(index / 8); const col = index % 8; const light = (row + col) % 2 === 0; return <button key={displayIndex} draggable={board[index] !== '.'} onDragStart={() => setSelectedSquare(index)} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (selectedSquare !== null && selectedSquare !== index) { setBoardHistory(prev => [...prev, [...board]]); setBoard(prev => { const next=[...prev]; next[index]=next[selectedSquare]; next[selectedSquare]='.'; return next; }); setSelectedSquare(null); } }} onClick={() => movePiece(index)} aria-label={'Casilla ' + (8-row) + '-' + (col+1)} style={{ border: 0, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', aspectRatio: '1', cursor: piece === '.' ? 'pointer' : 'grab', background: selectedSquare === index ? '#e7c65c' : light ? '#f0eadb' : '#78946f', color: piece === '.' ? 'transparent' : (piece === piece.toUpperCase() ? '#fff' : '#171717'), fontSize: 'clamp(22px,5vw,43px)', lineHeight: 1, textShadow: piece === piece.toUpperCase() ? '0 2px 3px rgba(0,0,0,.65)' : '0 1px 2px rgba(255,255,255,.6)', boxShadow: selectedSquare === index ? 'inset 0 0 0 3px #b08a24' : 'inset 0 0 0 1px rgba(0,0,0,.035)' }}>{CHESS_PIECES[piece] || ''}</button>; })}
+    {tab === 'Tablero libre' && <section style={{...panel,padding:isMobile?10:18}}>
+      <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',flexWrap:'wrap',marginBottom:15}}>
+        <div><div style={{fontSize:10,letterSpacing:'.12em',fontWeight:850,color:theme.textMuted}}>PARTIDA LOCAL · DOS JUGADORES</div><h2 style={{fontSize:19,margin:'5px 0'}}>Tablero de ajedrez</h2><p style={{fontSize:12,color:theme.textMuted}}>Selecciona una pieza y toca una casilla marcada para mover. Las jugadas ilegales se bloquean.</p></div>
+        <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+          <button onClick={undoBoardMove} disabled={!boardHistory.length} style={{padding:'9px 12px',borderRadius:11,border:'1px solid '+theme.cardBorder,background:theme.bg,color:theme.text,opacity:boardHistory.length?1:.4,cursor:boardHistory.length?'pointer':'not-allowed'}}>↶ Deshacer</button>
+          <button onClick={()=>setBoardFlipped(v=>!v)} style={{padding:'9px 12px',borderRadius:11,border:'1px solid '+theme.cardBorder,background:theme.bg,color:theme.text,cursor:'pointer'}}>⇅ Girar</button>
+          <button onClick={resetBoard} style={{padding:'9px 12px',borderRadius:11,border:0,background:theme.text,color:theme.bg,cursor:'pointer'}}>Nueva partida</button>
+        </div>
       </div>
-      <div style={{ textAlign: 'center', fontSize: 10, color: theme.textMuted, marginTop: 10 }}>Selecciona una pieza y luego una casilla destino. También puedes arrastrarla.</div>
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'minmax(0,1fr) 230px',gap:14,alignItems:'start'}}>
+        <div style={{width:'100%',maxWidth:610,margin:'0 auto'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 10px',background:theme.bg,border:'1px solid '+theme.cardBorder,borderBottom:0,borderRadius:'13px 13px 0 0',fontSize:12,fontWeight:800}}><span>♟ Negras</span><span style={{color:boardTurn==='black'?theme.text:'#999'}}>{boardTurn==='black'?'Juegan ahora':''}</span></div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(8,minmax(0,1fr))',border:'1px solid '+theme.cardBorder,overflow:'hidden',aspectRatio:'1',touchAction:'manipulation'}}>
+            {board.map((_,displayIndex)=>{const index=boardFlipped?63-displayIndex:displayIndex;const piece=board[index];const row=Math.floor(index/8),col=index%8,light=(row+col)%2===0;const isTarget=legalTargets.includes(index);const isSelected=selectedSquare===index;return <button key={displayIndex} onClick={()=>movePiece(index)} aria-label={'Casilla '+String.fromCharCode(97+col)+(8-row)+(piece!=='.'?' '+piece:'')} style={{position:'relative',border:0,padding:0,display:'grid',placeItems:'center',aspectRatio:'1',minWidth:0,cursor:'pointer',background:isSelected?'#e7c65c':light?'#eee9df':'#82977b',color:piece===piece.toUpperCase()?'#fff':'#171717',fontSize:'clamp(21px,5vw,48px)',lineHeight:1,textShadow:piece===piece.toUpperCase()?'0 2px 3px rgba(0,0,0,.65)':'0 1px 2px rgba(255,255,255,.65)',boxShadow:isSelected?'inset 0 0 0 3px #a17b23':'none'}}>{CHESS_PIECES[piece]||''}{isTarget&&piece==='.'&&<span style={{position:'absolute',width:'23%',height:'23%',borderRadius:'50%',background:'rgba(28,35,28,.35)'}}/>}{isTarget&&piece!=='.'&&<span style={{position:'absolute',inset:2,border:'3px solid rgba(180,45,45,.72)',borderRadius:'50%',pointerEvents:'none'}}/>}</button>})}
+          </div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 10px',background:theme.bg,border:'1px solid '+theme.cardBorder,borderTop:0,borderRadius:'0 0 13px 13px',fontSize:12,fontWeight:800}}><span>♙ Blancas</span><span style={{color:boardTurn==='white'?theme.text:'#999'}}>{boardTurn==='white'?'Juegan ahora':''}</span></div>
+        </div>
+        <aside style={{display:'grid',gap:10}}>
+          <div style={{padding:13,border:'1px solid '+theme.cardBorder,borderRadius:14,background:theme.bg}}><div style={{fontSize:10,fontWeight:850,letterSpacing:'.1em',color:theme.textMuted}}>ESTADO DE PARTIDA</div><div style={{fontSize:18,fontWeight:850,marginTop:5}}>{boardResult==='mate'?'Jaque mate':boardResult==='stalemate'?'Tablas':boardResult==='check'?'Jaque':boardTurn==='white'?'Turno de blancas':'Turno de negras'}</div><p style={{fontSize:11,color:theme.textMuted,marginTop:7,lineHeight:1.5}}>{boardNotice}</p></div>
+          <div style={{padding:13,border:'1px solid '+theme.cardBorder,borderRadius:14,background:theme.bg}}><div style={{fontSize:10,fontWeight:850,letterSpacing:'.1em',color:theme.textMuted,marginBottom:8}}>MOVIMIENTOS</div><div style={{maxHeight:220,overflowY:'auto',fontSize:12,lineHeight:1.8}}>{boardMoves.length?boardMoves.map((m,i)=><span key={i} style={{display:'inline-block',marginRight:9}}><span style={{color:theme.textMuted}}>{Math.floor(i/2)+1}{i%2===0?'.':''}</span> {m}</span>):<span style={{color:theme.textMuted}}>La partida aún no comienza.</span>}</div></div>
+          <button onClick={()=>{setSelectedSquare(null);setBoardNotice('Seleccion cancelada.')}} style={{padding:10,border:'1px solid '+theme.cardBorder,borderRadius:11,background:theme.card,color:theme.text,cursor:'pointer'}}>Cancelar selección</button>
+          <p style={{fontSize:10,color:theme.textMuted,lineHeight:1.5}}>Incluye movimientos de piezas, peones, captura, protección del rey, jaque, mate y promoción automática a dama. En esta versión no están habilitados el enroque ni la captura al paso.</p>
+        </aside>
+      </div>
     </section>}
     {tab === 'Recursos' && <div style={{ display: 'grid', gap: 13 }}>
       <section style={panel}><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>BIBLIOTECA DE AJEDREZ</div><h2 style={{ fontSize: 19, margin: '5px 0' }}>Libros y material de estudio</h2><p style={{ fontSize: 12, color: theme.textMuted }}>Lecturas abiertas y recursos seleccionados. Los libros se muestran dentro de LifeOS cuando el sitio permite inserción; también puedes abrir la fuente original.</p></section>
