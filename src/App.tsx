@@ -1258,6 +1258,7 @@ export default function App() {
       if (!AudioCtx) return;
       if (!audioContextRef.current) audioContextRef.current = new AudioCtx();
       const ctx = audioContextRef.current;
+      if (!ctx) return;
       if (ctx.state === 'suspended') void ctx.resume();
       const now = ctx.currentTime;
       const osc = ctx.createOscillator();
@@ -2606,21 +2607,22 @@ export default function App() {
     const allowedDays = new Set(['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']);
 
     sesScheduleSubjectSummaries.forEach(summary => {
-      if (summary.selectedSection === null) return;
-      summary.rows.filter(row => Number(row.CURS_SECCION) === summary.selectedSection).forEach(row => {
+      const selectedSection = summary.selectedSection;
+      if (selectedSection === null) return;
+      summary.rows.filter(row => Number(row.CURS_SECCION) === selectedSection).forEach(row => {
         const day = String(row.HOR_DIA || '').trim();
         const startTime = validSesClock(row.HOR_H_INI);
         const endTime = validSesClock(row.HOR_H_FIN);
         const courseCode = Number(row.CURS_CODIGO);
         if (!allowedDays.has(day) || !startTime || !endTime || !Number.isFinite(courseCode)) return;
         const room = String(row.SAL_NOMBRE || '').trim() || 'Sala por confirmar';
-        const key = `${summary.subject.id}|${courseCode}|${summary.selectedSection}|${day}|${startTime}|${endTime}`;
+        const key = `${summary.subject.id}|${courseCode}|${selectedSection}|${day}|${startTime}|${endTime}`;
         const existing = exactSlots.get(key);
         if (existing) existing.rooms.add(room);
         else exactSlots.set(key, {
           subject: summary.subject,
           courseCode,
-          section: summary.selectedSection,
+          section: selectedSection,
           day: day as ScheduleBlock['day'],
           startTime,
           endTime,
@@ -3205,7 +3207,7 @@ export default function App() {
     setNumControles(String(evs.filter(e=>e.type==='control').length)); setWeightControles(String(evs.find(e=>e.type==='control')?.weight || 0));
     setNumTrabajos(String(evs.filter(e=>e.type==='trabajo').length)); setWeightTrabajos(String(evs.find(e=>e.type==='trabajo')?.weight || 0));
     setHasExemption(sub.hasExemption); setExemptionGrade(String(sub.exemptionGrade)); setExamWeight(String(sub.examWeight)); setIsExamFailingRule(sub.isExamFailingRule); setMinGradeForOneOpportunity(String(sub.minGradeForOneOpportunity)); setMinGradeForTwoOpportunities(String(sub.minGradeForTwoOpportunities));
-    setSubBlocks((sub.scheduleBlocks.length ? sub.scheduleBlocks : [{day:'Lunes',startTime:'08:30',endTime:'10:00'}]).map(b=>({day:b.day,startTime:b.startTime,endTime:b.endTime})));
+    setSubBlocks((sub.scheduleBlocks.length ? sub.scheduleBlocks : [{day:'Lunes' as ScheduleBlock['day'],startTime:'08:30',endTime:'10:00'}]).map(b=>({day:b.day,startTime:b.startTime,endTime:b.endTime})));
     setShowSubjectModal(true);
   };
 
