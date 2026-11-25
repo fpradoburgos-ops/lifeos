@@ -770,6 +770,51 @@ const LIFEOS_V9_CSS = `
 
   :root { --lifeos-card-bg: #141416; --lifeos-card-border:#27272a; --lifeos-text:#f4f4f5; --lifeos-muted:#8e8e93; --lifeos-card:#141416; }
 
+  /* LifeOS · acabado iOS sobrio, sin transparencias ni efecto cristal */
+  html[data-lifeos-theme='dark'] body { background:#09090b; }
+  html[data-lifeos-theme='light'] body { background:#f4f4f5; }
+  .lifeos-app-shell { min-height:100vh; letter-spacing:-.01em; }
+  .lifeos-dash-card, .lifeos-dashboard-footer-card, .lifeos-card, .lifeos-animated-panel {
+    border-radius:18px !important;
+  }
+  .lifeos-dashboard-header {
+    border-radius:20px;
+    padding:26px 28px;
+    background:linear-gradient(145deg,#18181b,#242427);
+    border-color:#303034;
+    box-shadow:0 12px 32px rgba(0,0,0,.10);
+  }
+  .lifeos-header-actions button { border-radius:12px; }
+  .lifeos-app-shell aside nav button { border-radius:14px !important; }
+  .lifeos-app-shell input, .lifeos-app-shell select, .lifeos-app-shell textarea {
+    border-radius:12px !important;
+  }
+  .lifeos-app-shell button:focus-visible,
+  .lifeos-app-shell input:focus-visible,
+  .lifeos-app-shell select:focus-visible,
+  .lifeos-app-shell textarea:focus-visible {
+    outline:2px solid #a1a1aa;
+    outline-offset:2px;
+  }
+  html[data-lifeos-theme='light'] .lifeos-dashboard-header {
+    background:linear-gradient(145deg,#ffffff,#ededf0);
+    color:#18181b;
+    border-color:#e4e4e7;
+    box-shadow:0 12px 32px rgba(24,24,27,.06);
+  }
+  html[data-lifeos-theme='light'] .lifeos-dashboard-header .lifeos-overline,
+  html[data-lifeos-theme='light'] .lifeos-dashboard-header .lifeos-date-week,
+  html[data-lifeos-theme='light'] .lifeos-dashboard-header p { color:#71717a; }
+  html[data-lifeos-theme='light'] .lifeos-dashboard-header h1 { color:#18181b; }
+  html[data-lifeos-theme='light'] .lifeos-header-actions button {
+    background:#ffffff;
+    border-color:#dedee3;
+    color:#27272a;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lifeos-app-shell button { transition:none !important; }
+  }
+
   @media (max-width: 639px) {
     .lifeos-main { padding: 12px !important; }
     .lifeos-card { border-radius: 14px !important; }
@@ -834,6 +879,10 @@ export default function App() {
       return true;
     }
   });
+
+  useEffect(() => {
+    document.documentElement.dataset.lifeosTheme = darkMode ? 'dark' : 'light';
+  }, [darkMode]);
 
   const [activeTab, setActiveTab] = useState<'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes'>(() => { try { return (sessionStorage.getItem('lifeos_ui_active_tab') as any) || 'inicio'; } catch { return 'inicio'; } });
   const [studySubTab, setStudySubTab] = useState<'semestre' | 'materias' | 'malla' | 'horario' | 'calendario' | 'historial'>(() => { try { return (sessionStorage.getItem('lifeos_ui_study_tab') as any) || 'materias'; } catch { return 'materias'; } });
@@ -3045,7 +3094,7 @@ export default function App() {
   return (
     <>
       <style>{LIFEOS_V9_CSS}</style>
-      <div style={{ '--lifeos-card-bg': theme.card, '--lifeos-card-border': theme.cardBorder, '--lifeos-text': theme.text, '--lifeos-muted': theme.textMuted, '--lifeos-card': theme.card, display: 'flex', minHeight: '100vh', backgroundColor: theme.bg, color: theme.text, fontFamily: 'system-ui, -apple-system, sans-serif' } as React.CSSProperties}>
+      <div className="lifeos-app-shell" data-lifeos-theme={darkMode ? 'dark' : 'light'} style={{ '--lifeos-card-bg': theme.card, '--lifeos-card-border': theme.cardBorder, '--lifeos-text': theme.text, '--lifeos-muted': theme.textMuted, '--lifeos-card': theme.card, display: 'flex', minHeight: '100vh', backgroundColor: theme.bg, color: theme.text, fontFamily: 'system-ui, -apple-system, sans-serif' } as React.CSSProperties}>
       
       {/* SIDEBAR COLAPSABLE */}
       <aside style={{
@@ -3158,7 +3207,12 @@ export default function App() {
               <div style={{width:36,height:36,borderRadius:11,backgroundColor:theme.primary,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900}}>⚗</div>
               <div><div style={{fontSize:15,fontWeight:900}}>Life<span style={{color:theme.primary}}>OS</span></div><div style={{fontSize:10,color:theme.textMuted}}>{currentSemesterName}</div></div>
             </div>
-            <button onClick={()=>setSidebarOpen(true)} aria-label="Abrir navegación" style={{width:40,height:40,padding:0,border:`1px solid ${theme.cardBorder}`,backgroundColor:theme.card,color:theme.text,display:'flex',alignItems:'center',justifyContent:'center'}}><Menu size={19}/></button>
+            <div style={{display:'flex',alignItems:'center',gap:7}}>
+              <button onClick={()=>setDarkMode(!darkMode)} aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'} title={darkMode ? 'Modo claro' : 'Modo oscuro'} style={{width:40,height:40,padding:0,border:`1px solid ${theme.cardBorder}`,backgroundColor:theme.card,color:theme.text,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:12}}>
+                {darkMode ? <Sun size={18}/> : <Moon size={18}/>}
+              </button>
+              <button onClick={()=>setSidebarOpen(true)} aria-label="Abrir navegación" style={{width:40,height:40,padding:0,border:`1px solid ${theme.cardBorder}`,backgroundColor:theme.card,color:theme.text,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:12}}><Menu size={19}/></button>
+            </div>
           </div>
         )}
         
@@ -4435,6 +4489,20 @@ export default function App() {
         {/* ================= VISTA: CONFIGURACIÓN ================= */}
         {activeTab === 'ajustes' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '540px' }}>
+            <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <h1 style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}>Apariencia</h1>
+                <p style={{ fontSize: '12px', color: theme.textMuted, marginTop: 5 }}>Elige cómo quieres ver LifeOS. Tu preferencia queda guardada.</p>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <button type="button" onClick={() => setDarkMode(false)} aria-pressed={!darkMode} style={{ display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'12px 10px',border:`1px solid ${!darkMode ? theme.text : theme.cardBorder}`,borderRadius:13,background:!darkMode?theme.activeTab:'transparent',color:theme.text,fontWeight:800,cursor:'pointer' }}>
+                  <Sun size={17}/> Claro
+                </button>
+                <button type="button" onClick={() => setDarkMode(true)} aria-pressed={darkMode} style={{ display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'12px 10px',border:`1px solid ${darkMode ? theme.text : theme.cardBorder}`,borderRadius:13,background:darkMode?theme.activeTab:'transparent',color:theme.text,fontWeight:800,cursor:'pointer' }}>
+                  <Moon size={17}/> Oscuro
+                </button>
+              </div>
+            </div>
             <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <h1 style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}>Perfil y Carrera ⚙️</h1>
               <div>
