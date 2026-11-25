@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { EnglishWorkspace, FlashcardsWorkspace } from './StudyTools';
+import { EnglishWorkspace, FlashcardsWorkspace, CreatorProjectsWorkspace } from './StudyTools';
 import { 
   Home, 
   GraduationCap, 
@@ -44,7 +44,7 @@ import {
   Trophy
 } from 'lucide-react';
 
-type LifeOSTab = 'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes' | 'ayudante' | 'ajedrez' | 'ingles';
+type LifeOSTab = 'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes' | 'ayudante' | 'ajedrez' | 'ingles' | 'creadores';
 type AssistantEntryType = 'Ramo' | 'Proyecto' | 'Idea' | 'Fórmula' | 'Reunión' | 'Tarea' | 'Ponderación';
 type AssistantEntry = { id: number; type: AssistantEntryType; title: string; course: string; content: string; date: string; weight: string; done: boolean };
 type ChessSession = { id: number; date: string; minutes: number; focus: string; notes: string };
@@ -669,6 +669,25 @@ const LIFEOS_V9_CSS = `
     .lifeos-main { padding-left: 22px !important; padding-right: 22px !important; }
   }
 
+  /* LifeOS refined iOS-inspired visual system: solid surfaces, restrained borders, calm spacing */
+  .lifeos-app-shell { width:100% !important; max-width:none !important; }
+  .lifeos-main { width:100% !important; max-width:none !important; }
+  .lifeos-app-shell button { border-radius:12px !important; font-weight:650; letter-spacing:-.01em; box-shadow:none; }
+  .lifeos-app-shell button:focus-visible { outline:2px solid #8b8b92 !important; outline-offset:2px; }
+  .lifeos-app-shell input, .lifeos-app-shell select, .lifeos-app-shell textarea { border-radius:12px !important; }
+  .lifeos-app-shell input:focus, .lifeos-app-shell select:focus, .lifeos-app-shell textarea:focus { border-color:#8b8b92 !important; box-shadow:0 0 0 3px rgba(140,140,150,.13) !important; }
+  .lifeos-app-shell article, .lifeos-app-shell section { border-radius:18px; }
+  .lifeos-app-shell h1, .lifeos-app-shell h2, .lifeos-app-shell h3 { letter-spacing:-.035em; }
+  .lifeos-app-shell p { line-height:1.55; }
+  .lifeos-app-shell button:hover { transform:translateY(-1px); }
+  .lifeos-app-shell button:active { transform:scale(.98); }
+  @media (min-width:1200px) {
+    .lifeos-main { padding-left:clamp(28px,3vw,54px) !important; padding-right:clamp(28px,3vw,54px) !important; }
+  }
+  @media (max-width:639px) {
+    .lifeos-main { padding-left:14px !important; padding-right:14px !important; }
+  }
+
   .lifeos-dashboard { max-width: 1180px; margin: 0 auto; }
   .lifeos-dashboard-header { display:flex; justify-content:space-between; align-items:center; gap:24px; padding:22px 24px; margin-bottom:14px; background:linear-gradient(135deg, #151515, #202020); color:#f5f5f5; border:1px solid #2d2d2d; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.12); }
   .lifeos-overline { display:block; font-size:9px; font-weight:900; letter-spacing:.12em; color:#858585; text-transform:uppercase; }
@@ -862,10 +881,11 @@ const LIFEOS_V9_CSS = `
 
 type AssistantCourseSection = 'Recursos a presentar' | 'Recursos a crear' | 'Ponderaciones' | 'Próximas evaluaciones' | 'Reuniones' | 'Clases a impartir' | 'Apuntes';
 type AssistantCourseItem = { id: number; section: AssistantCourseSection; title: string; detail: string; date: string; weight: string; done: boolean };
-type AssistantCourse = { id: number; name: string; code: string; description: string; items: AssistantCourseItem[] };
+type AssistantContact = { id:number; name:string; role:string; email:string; phone:string; notes:string };
+type AssistantCourse = { id: number; name: string; code: string; description: string; items: AssistantCourseItem[]; contacts?: AssistantContact[] };
 
 
-const ASSISTANT_SECTIONS: AssistantCourseSection[] = ['Recursos a presentar','Recursos a crear','Ponderaciones','Próximas evaluaciones','Reuniones','Clases a impartir','Apuntes'];
+const ASSISTANT_SECTIONS: (AssistantCourseSection | 'Contactos docentes')[] = ['Recursos a presentar','Recursos a crear','Ponderaciones','Próximas evaluaciones','Reuniones','Clases a impartir','Apuntes','Contactos docentes'];
 
 function AssistantWorkspace({ theme, isMobile }: { theme: any; isMobile: boolean }) {
   const [courses, setCourses] = useState<AssistantCourse[]>(() => {
@@ -889,10 +909,13 @@ function AssistantWorkspace({ theme, isMobile }: { theme: any; isMobile: boolean
   const [itemDate, setItemDate] = useState('');
   const [itemWeight, setItemWeight] = useState('');
   const [showCourseForm, setShowCourseForm] = useState(false);
+  const [contactName,setContactName]=useState(''); const [contactRole,setContactRole]=useState('Profesor/a'); const [contactEmail,setContactEmail]=useState(''); const [contactPhone,setContactPhone]=useState(''); const [contactNotes,setContactNotes]=useState('');
 
   useEffect(() => { localStorage.setItem('lifeos_assistant_courses', JSON.stringify(courses)); }, [courses]);
   const selectedCourse = courses.find(c => c.id === selectedCourseId) || null;
   const sectionItems = selectedCourse?.items.filter(item => item.section === section) || [];
+  const courseContacts = selectedCourse?.contacts || [];
+  const addContact = (event:React.FormEvent) => { event.preventDefault(); if(!selectedCourse || !contactName.trim() || (!contactEmail.trim() && !contactPhone.trim())) return; const contact:AssistantContact={id:Date.now(),name:contactName.trim(),role:contactRole,email:contactEmail.trim(),phone:contactPhone.trim(),notes:contactNotes.trim()}; setCourses(prev=>prev.map(c=>c.id===selectedCourse.id?{...c,contacts:[...(c.contacts||[]),contact]}:c)); setContactName('');setContactEmail('');setContactPhone('');setContactNotes(''); };
   const ponderationTotal = (selectedCourse?.items || []).filter(item => item.section === 'Ponderaciones').reduce((sum, item) => sum + (Number(String(item.weight).replace(',', '.').replace('%', '').trim()) || 0), 0);
   const panel = { background: theme.card, border: '1px solid ' + theme.cardBorder, borderRadius: 17, padding: 17 };
   const field = { width: '100%', boxSizing: 'border-box' as const, padding: 11, borderRadius: 10, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, font: 'inherit' };
@@ -908,6 +931,7 @@ function AssistantWorkspace({ theme, isMobile }: { theme: any; isMobile: boolean
   const addItem = (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedCourse || !itemTitle.trim()) return;
+    if(section==='Contactos docentes') return;
     const item: AssistantCourseItem = { id: Date.now(), section, title: itemTitle.trim(), detail: itemDetail.trim(), date: itemDate, weight: itemWeight.trim(), done: false };
     setCourses(prev => prev.map(course => course.id === selectedCourse.id ? { ...course, items: [item, ...course.items] } : course));
     setItemTitle(''); setItemDetail(''); setItemDate(''); setItemWeight('');
@@ -954,6 +978,18 @@ function AssistantWorkspace({ theme, isMobile }: { theme: any; isMobile: boolean
       <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 9, marginBottom: 12 }}>
         {ASSISTANT_SECTIONS.map(name => <button key={name} onClick={() => setSection(name)} style={{ whiteSpace: 'nowrap', padding: '9px 11px', borderRadius: 10, border: '1px solid ' + theme.cardBorder, background: section === name ? theme.text : theme.card, color: section === name ? theme.bg : theme.text, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{name}</button>)}
       </div>
+      {section === 'Contactos docentes' && <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'minmax(260px,.8fr) minmax(0,1.2fr)',gap:13,alignItems:'start'}}>
+        <form onSubmit={addContact} style={{...panel,display:'grid',gap:9}}><h3 style={{margin:0,fontSize:15}}>Agregar contacto docente</h3>
+          <input required value={contactName} onChange={e=>setContactName(e.target.value)} placeholder="Nombre del profesor/a" style={field}/>
+          <select value={contactRole} onChange={e=>setContactRole(e.target.value)} style={field}>{['Profesor/a','Coordinador/a','Ayudante coordinador/a','Secretaría docente','Otro'].map(x=><option key={x}>{x}</option>)}</select>
+          <input type="email" value={contactEmail} onChange={e=>setContactEmail(e.target.value)} placeholder="Correo institucional" style={field}/>
+          <input type="tel" value={contactPhone} onChange={e=>setContactPhone(e.target.value)} placeholder="Teléfono / WhatsApp" style={field}/>
+          <textarea rows={3} value={contactNotes} onChange={e=>setContactNotes(e.target.value)} placeholder="Horario de consulta, oficina u otras notas" style={{...field,resize:'vertical'}}/>
+          <button type="submit" style={{padding:11,border:0,borderRadius:11,background:theme.text,color:theme.bg,fontWeight:850,cursor:'pointer'}}>Guardar contacto</button>
+          <p style={{fontSize:10,color:theme.textMuted}}>Ingresa al menos un correo o teléfono. Los datos quedan asociados solo a este ramo de ayudantía.</p>
+        </form>
+        <section style={panel}><h3 style={{margin:'0 0 10px',fontSize:15}}>Directorio del ramo · {courseContacts.length}</h3>{courseContacts.length?courseContacts.map(c=><article key={c.id} style={{padding:12,border:'1px solid '+theme.cardBorder,borderRadius:13,marginBottom:8,background:theme.bg}}><div style={{display:'flex',justifyContent:'space-between',gap:8}}><div><strong style={{fontSize:13}}>{c.name}</strong><div style={{fontSize:11,color:theme.textMuted}}>{c.role}</div></div><button onClick={()=>setCourses(prev=>prev.map(x=>x.id===selectedCourse.id?{...x,contacts:(x.contacts||[]).filter(y=>y.id!==c.id)}:x))} style={{border:0,background:'transparent',color:theme.textMuted,cursor:'pointer'}}>Eliminar</button></div>{c.email&&<div style={{fontSize:12,marginTop:8}}>✉ <a href={'mailto:'+c.email} style={{color:theme.text}}>{c.email}</a></div>}{c.phone&&<div style={{fontSize:12,marginTop:5}}>☎ <a href={'tel:'+c.phone} style={{color:theme.text}}>{c.phone}</a></div>}{c.notes&&<p style={{fontSize:11,color:theme.textMuted,marginTop:7}}>{c.notes}</p>}</article>):<p style={{fontSize:12,color:theme.textMuted}}>Todavía no has guardado profesores para este ramo.</p>}</section>
+      </div>}
       {section === 'Ponderaciones' && <div style={{ ...panel, marginBottom: 13 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}><strong style={{ fontSize: 13 }}>Ponderación acumulada</strong><strong style={{ fontSize: 16 }}>{ponderationTotal}%</strong></div><div style={{ height: 7, borderRadius: 99, background: theme.bg, overflow: 'hidden', marginTop: 9 }}><div style={{ height: '100%', width: Math.min(100, ponderationTotal) + '%', background: ponderationTotal > 100 ? '#dc6b6b' : theme.text, borderRadius: 99, transition: 'width .2s ease' }}/></div><p style={{ fontSize: 11, color: theme.textMuted, marginTop: 7 }}>{ponderationTotal === 100 ? 'Las evaluaciones suman 100%.' : ponderationTotal > 100 ? 'La suma supera el 100%; revisa los porcentajes.' : 'Registra cada evaluación y su porcentaje hasta completar el 100%.'}</p></div>}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(260px,.8fr) minmax(0,1.3fr)', gap: 13, alignItems: 'start' }}>
         <form onSubmit={addItem} style={{ ...panel, display: 'flex', flexDirection: 'column', gap: 9 }}>
@@ -999,7 +1035,7 @@ function ChessWorkspace(props: {
   const [openingColor, setOpeningColor] = useState('Blancas');
   const [openingMoves, setOpeningMoves] = useState('');
   const [openingNotes, setOpeningNotes] = useState('');
-  const [readingResources, setReadingResources] = useState<{id:number;title:string;url:string}[]>(() => { try { return JSON.parse(localStorage.getItem('lifeos_chess_resources') || '[]'); } catch { return []; } });
+  const [readingResources, setReadingResources] = useState<{id:number;title:string;url:string}[]>(() => { try { const saved=JSON.parse(localStorage.getItem('lifeos_chess_resources') || 'null'); return Array.isArray(saved) && saved.length ? saved : [{id:-1,title:'Chess Strategy — Edward Lasker',url:'https://www.gutenberg.org/files/5614/5614-h/5614-h.htm'},{id:-2,title:'The Blue Book of Chess — Howard Staunton',url:'https://www.gutenberg.org/files/16377/16377-h/16377-h.htm'},{id:-3,title:'Studies of Chess — François Philidor',url:'https://www.gutenberg.org/ebooks/78804'},{id:-4,title:'Chess and Checkers — Edward Lasker',url:'https://www.gutenberg.org/ebooks/4903'}]; } catch { return []; } });
   const [resourceTitle, setResourceTitle] = useState('');
   const [resourceUrl, setResourceUrl] = useState('');
   const [selectedResourceId, setSelectedResourceId] = useState<number | null>(null);
@@ -1047,7 +1083,7 @@ function ChessWorkspace(props: {
     {tab === 'Recursos' && <div style={{ display: 'grid', gap: 13 }}>
       <section style={panel}><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>BIBLIOTECA DE AJEDREZ</div><h2 style={{ fontSize: 19, margin: '5px 0' }}>Libros y material de estudio</h2><p style={{ fontSize: 12, color: theme.textMuted }}>Lecturas abiertas y recursos seleccionados. Los libros se muestran dentro de LifeOS cuando el sitio permite inserción; también puedes abrir la fuente original.</p></section>
       <section style={panel}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>Tu biblioteca de lectura</h3>
+        <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>Biblioteca de lectura</h3>
         <form onSubmit={e => { e.preventDefault(); if (!resourceTitle.trim() || !resourceUrl.trim()) return; try { const parsed = new URL(resourceUrl.trim()); if (!['https:','http:'].includes(parsed.protocol)) throw new Error(); const item = { id: Date.now(), title: resourceTitle.trim(), url: parsed.toString() }; setReadingResources(prev => [item, ...prev]); setSelectedResourceId(item.id); setResourceTitle(''); setResourceUrl(''); } catch { alert('Ingresa un enlace web válido que comience con https:// o http://'); } }} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.4fr auto', gap: 8 }}>
           <input value={resourceTitle} onChange={e => setResourceTitle(e.target.value)} placeholder="Nombre del libro o recurso" required style={field}/>
           <input value={resourceUrl} onChange={e => setResourceUrl(e.target.value)} placeholder="URL de lectura (HTML o visor web)" required style={field}/>
@@ -3405,7 +3441,8 @@ export default function App() {
               { id: 'calendario', label: 'Calendario Maestro', icon: <CalendarDays size={19} /> },
               { id: 'enlaces', label: 'Vault / Enlaces', icon: <Bookmark size={19} /> },
               { id: 'ayudante', label: 'Ayudante', icon: <ClipboardList size={19} /> },
-              { id: 'ingles', label: 'English', icon: <BookOpen size={19} /> }, 
+              { id: 'ingles', label: 'English', icon: <BookOpen size={19} /> },
+              { id: 'creadores', label: 'Contenido & redes', icon: <Image size={19} /> }, 
               { id: 'ajedrez', label: 'Ajedrez', icon: <Puzzle size={19} /> },
               { id: 'ajustes', label: 'Configuración', icon: <Settings size={19} /> }
             ].map(tab => (
@@ -4744,6 +4781,7 @@ export default function App() {
           />
         )}
         {activeTab === 'ingles' && <EnglishWorkspace theme={theme} isMobile={isMobile} />}
+        {activeTab === 'creadores' && <CreatorProjectsWorkspace theme={theme} isMobile={isMobile} />}
         {/* ================= VISTA: ENLACES ================= */}
         {activeTab === 'enlaces' && (
           <div>
