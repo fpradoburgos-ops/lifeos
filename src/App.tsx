@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { EnglishWorkspace, FlashcardsWorkspace } from './StudyTools';
 import { 
   Home, 
   GraduationCap, 
@@ -43,7 +44,7 @@ import {
   Trophy
 } from 'lucide-react';
 
-type LifeOSTab = 'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes' | 'ayudante' | 'ajedrez';
+type LifeOSTab = 'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes' | 'ayudante' | 'ajedrez' | 'ingles';
 type AssistantEntryType = 'Ramo' | 'Proyecto' | 'Idea' | 'Fórmula' | 'Reunión' | 'Tarea' | 'Ponderación';
 type AssistantEntry = { id: number; type: AssistantEntryType; title: string; course: string; content: string; date: string; weight: string; done: boolean };
 type ChessSession = { id: number; date: string; minutes: number; focus: string; notes: string };
@@ -982,7 +983,7 @@ function ChessWorkspace(props: {
   chessNotes: string; setChessNotes: (value: string) => void;
 }) {
   const { theme, isMobile, chessSessions, setChessSessions, chessGoal, setChessGoal, chessRating, setChessRating, chessMinutes, setChessMinutes, chessFocus, setChessFocus, chessNotes, setChessNotes } = props;
-  const [tab, setTab] = useState<'Entrenamiento'|'Videos'|'Tablero libre'|'Aperturas'>('Entrenamiento');
+  const [tab, setTab] = useState<'Entrenamiento'|'Videos'|'Tablero libre'|'Aperturas'|'Recursos'>('Entrenamiento');
   const [board, setBoard] = useState<string[]>(() => [...START_CHESS_BOARD]);
   const [selectedSquare, setSelectedSquare] = useState<number | null>(null);
   const [openings, setOpenings] = useState<ChessOpeningNote[]>(() => { try { return JSON.parse(localStorage.getItem('lifeos_chess_openings') || '[]'); } catch { return []; } });
@@ -1012,7 +1013,7 @@ function ChessWorkspace(props: {
 
   return <div style={{ maxWidth: 1100, margin: '0 auto' }}>
     <div style={{ marginBottom: 18 }}><div className="lifeos-overline">ENTRENAMIENTO PERSONAL</div><h1 style={{ fontSize: isMobile ? 25 : 32, fontWeight: 900, margin: '5px 0' }}>Ajedrez ♟</h1><p style={{ fontSize: 13, color: theme.textMuted, margin: 0 }}>Practica, estudia aperturas y guarda tus recursos en un solo lugar.</p></div>
-    <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, marginBottom: 14 }}>{(['Entrenamiento','Videos','Tablero libre','Aperturas'] as const).map(tabButton)}</div>
+    <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, marginBottom: 14 }}>{(['Entrenamiento','Videos','Tablero libre','Aperturas','Recursos'] as const).map(tabButton)}</div>
     {tab === 'Videos' && <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,minmax(0,1fr))', gap: 12 }}>
       {[{name:'Ajedrez Magistral',query:'Ajedrez Magistral ajedrez',desc:'Clases, ideas y contenido de ajedrez en español.'},{name:'Rey Enigma',query:'Rey Enigma ajedrez',desc:'Videos, partidas y retos de ajedrez.'}].map(channel => <article key={channel.name} style={panel}><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>CANAL DE YOUTUBE</div><h3 style={{ margin: '6px 0', fontSize: 17 }}>{channel.name}</h3><p style={{ fontSize: 12, color: theme.textMuted }}>{channel.desc}</p><a href={'https://www.youtube.com/results?search_query=' + encodeURIComponent(channel.query) + '&sp=CAI%3D'} target="_blank" rel="noreferrer" style={{ display: 'inline-block', padding: '9px 12px', borderRadius: 9, background: theme.text, color: theme.bg, textDecoration: 'none', fontSize: 11, fontWeight: 900 }}>Ver videos recientes ↗</a></article>)}
       <article style={{ ...panel, gridColumn: isMobile ? 'auto' : '1 / -1' }}><h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Buscar más videos</h3><p style={{ fontSize: 12, color: theme.textMuted }}>Abre YouTube con resultados recientes sobre el tema que quieras estudiar.</p><a href="https://www.youtube.com/results?search_query=ajedrez+clases+analisis+aperturas&sp=CAI%3D" target="_blank" rel="noreferrer" style={{ color: theme.text, fontWeight: 900, fontSize: 12 }}>Explorar videos de ajedrez ↗</a></article>
@@ -1024,6 +1025,14 @@ function ChessWorkspace(props: {
       </div>
       <div style={{ textAlign: 'center', fontSize: 10, color: theme.textMuted, marginTop: 10 }}>Selecciona una pieza y luego una casilla destino. También puedes arrastrarla.</div>
     </section>}
+    {tab === 'Recursos' && <div style={{ display: 'grid', gap: 13 }}>
+      <section style={panel}><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>BIBLIOTECA DE AJEDREZ</div><h2 style={{ fontSize: 19, margin: '5px 0' }}>Libros y material de estudio</h2><p style={{ fontSize: 12, color: theme.textMuted }}>Lecturas abiertas y recursos seleccionados. Los libros se muestran dentro de LifeOS cuando el sitio permite inserción; también puedes abrir la fuente original.</p></section>
+      <section style={{ ...panel, padding: 0, overflow: 'hidden' }}><div style={{ padding: 15 }}><h3 style={{ margin: 0, fontSize: 16 }}>Chess Fundamentals — José Raúl Capablanca</h3><p style={{ fontSize: 11, color: theme.textMuted, margin: '5px 0 10px' }}>Clásico de estrategia, finales y principios de apertura. Texto íntegro disponible gratuitamente en Project Gutenberg.</p><a href="https://www.gutenberg.org/ebooks/33870" target="_blank" rel="noreferrer" style={{ color: theme.text, fontSize: 12, fontWeight: 900 }}>Abrir ficha y formatos ↗</a></div><iframe title="Chess Fundamentals de Capablanca" src="https://www.gutenberg.org/cache/epub/33870/pg33870-images.html" style={{ width: '100%', height: isMobile ? 560 : 760, border: 0, background: '#fff' }} loading="lazy" /></section>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,minmax(0,1fr))', gap: 12 }}>
+        <article style={panel}><h3 style={{ fontSize: 15, margin: '0 0 6px' }}>Lichess · Learn</h3><p style={{ fontSize: 12, color: theme.textMuted, marginBottom: 10 }}>Lecciones interactivas de reglas, táctica, estrategia y finales.</p><a href="https://lichess.org/learn" target="_blank" rel="noreferrer" style={{ color: theme.text, fontWeight: 900, fontSize: 12 }}>Ir a las lecciones ↗</a></article>
+        <article style={panel}><h3 style={{ fontSize: 15, margin: '0 0 6px' }}>Lichess · Practice</h3><p style={{ fontSize: 12, color: theme.textMuted, marginBottom: 10 }}>Practica mates, clavadas, ataques dobles y otros patrones tácticos.</p><a href="https://lichess.org/practice" target="_blank" rel="noreferrer" style={{ color: theme.text, fontWeight: 900, fontSize: 12 }}>Abrir ejercicios ↗</a></article>
+      </div>
+    </div>}
     {tab === 'Aperturas' && <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(250px,.8fr) minmax(0,1.2fr)', gap: 12, alignItems: 'start' }}>
       <form onSubmit={addOpening} style={{ ...panel, display: 'flex', flexDirection: 'column', gap: 9 }}><h2 style={{ fontSize: 16, margin: 0 }}>Nueva apertura / variante</h2><input required value={openingName} onChange={e => setOpeningName(e.target.value)} placeholder="Ej. Defensa Siciliana" style={field}/><select value={openingColor} onChange={e => setOpeningColor(e.target.value)} style={field}><option>Blancas</option><option>Negras</option><option>Ambos colores</option></select><textarea value={openingMoves} onChange={e => setOpeningMoves(e.target.value)} rows={3} placeholder="Movimientos o secuencia (ej. 1. e4 c5 2. Cf3…)" style={{ ...field, resize: 'vertical' }}/><textarea value={openingNotes} onChange={e => setOpeningNotes(e.target.value)} rows={4} placeholder="Planes, ideas, trampas, errores que evitar…" style={{ ...field, resize: 'vertical' }}/><button type="submit" style={{ padding: 11, border: 0, borderRadius: 10, background: theme.text, color: theme.bg, fontWeight: 900, cursor: 'pointer' }}>Guardar en repertorio</button></form>
       <section style={panel}><h2 style={{ fontSize: 16, margin: '0 0 10px' }}>Mi repertorio · {openings.length}</h2>{openings.length === 0 ? <p style={{ fontSize: 12, color: theme.textMuted, textAlign: 'center', padding: 20 }}>Aún no has guardado aperturas.</p> : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{openings.map(opening => <article key={opening.id} style={{ padding: 12, borderRadius: 11, border: '1px solid ' + theme.cardBorder, background: theme.bg, opacity: opening.done ? .62 : 1 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><div><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>{opening.color.toUpperCase()}</div><h3 style={{ fontSize: 14, margin: '4px 0' }}>{opening.name}</h3></div><button onClick={() => setOpenings(prev => prev.filter(x => x.id !== opening.id))} title="Eliminar" style={{ border: 0, background: 'transparent', color: theme.textMuted, cursor: 'pointer' }}><Trash2 size={15}/></button></div>{opening.moves && <div style={{ fontFamily: 'monospace', fontSize: 12, margin: '7px 0', whiteSpace: 'pre-wrap' }}>{opening.moves}</div>}{opening.notes && <p style={{ fontSize: 12, color: theme.textMuted, whiteSpace: 'pre-wrap', margin: '6px 0' }}>{opening.notes}</p>}<button onClick={() => setOpenings(prev => prev.map(x => x.id === opening.id ? { ...x, done: !x.done } : x))} style={{ marginTop: 7, padding: '7px 10px', borderRadius: 8, border: '1px solid ' + theme.cardBorder, background: opening.done ? theme.card : 'transparent', color: theme.text, fontSize: 10, fontWeight: 900, cursor: 'pointer' }}>{opening.done ? '✓ Apertura aprendida · Marcar pendiente' : 'Marcar como aprendida'}</button></article>)}</div>}</section>
@@ -1085,7 +1094,7 @@ export default function App() {
   }, [darkMode]);
 
   const [activeTab, setActiveTab] = useState<LifeOSTab>(() => { try { return (sessionStorage.getItem('lifeos_ui_active_tab') as LifeOSTab) || 'inicio'; } catch { return 'inicio'; } });
-  const [studySubTab, setStudySubTab] = useState<'semestre' | 'materias' | 'malla' | 'horario' | 'calendario' | 'historial'>(() => { try { return (sessionStorage.getItem('lifeos_ui_study_tab') as any) || 'materias'; } catch { return 'materias'; } });
+  const [studySubTab, setStudySubTab] = useState<'semestre' | 'materias' | 'malla' | 'horario' | 'calendario' | 'historial' | 'flashcards'>(() => { try { return (sessionStorage.getItem('lifeos_ui_study_tab') as any) || 'materias'; } catch { return 'materias'; } });
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [todoFilter, setTodoFilter] = useState<'Todas' | 'Pendientes' | 'Completadas'>('Todas');
   const [habitSubTab, setHabitSubTab] = useState<'dia' | 'semana' | 'mes'>(() => { try { return (sessionStorage.getItem('lifeos_ui_habit_tab') as any) || 'dia'; } catch { return 'dia'; } });
@@ -3360,7 +3369,8 @@ export default function App() {
               { id: 'todos', label: 'To-Do List', icon: <ListTodo size={19} />, badge: pendingTodos },
               { id: 'calendario', label: 'Calendario Maestro', icon: <CalendarDays size={19} /> },
               { id: 'enlaces', label: 'Vault / Enlaces', icon: <Bookmark size={19} /> },
-              { id: 'ayudante', label: 'Ayudante', icon: <GraduationCap size={19} /> },
+              { id: 'ayudante', label: 'Ayudante', icon: <ClipboardList size={19} /> },
+              { id: 'ingles', label: 'English', icon: <BookOpen size={19} /> }, 
               { id: 'ajedrez', label: 'Ajedrez', icon: <Puzzle size={19} /> },
               { id: 'ajustes', label: 'Configuración', icon: <Settings size={19} /> }
             ].map(tab => (
@@ -3690,7 +3700,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* 1. SUB-TAB: SEMESTRE */}
+            <button onClick={() => setStudySubTab('flashcards')} style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', background: studySubTab === 'flashcards' ? theme.primary : theme.card, color: studySubTab === 'flashcards' ? '#fff' : theme.textMuted, fontWeight: '700', fontSize: '12px', whiteSpace: 'nowrap', cursor: 'pointer' }}>Flashcards</button>
+              {/* 1. SUB-TAB: SEMESTRE */}
             {studySubTab === 'semestre' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 <div style={{ backgroundColor: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: '20px', padding: '22px' }}>
@@ -4168,6 +4179,7 @@ export default function App() {
                 ))}
               </div>
             )}
+            {studySubTab === 'flashcards' && <FlashcardsWorkspace theme={theme} isMobile={isMobile} />}
           </div>
         )}
 
@@ -4696,6 +4708,7 @@ export default function App() {
             setChessNotes={setChessNotes}
           />
         )}
+        {activeTab === 'ingles' && <EnglishWorkspace theme={theme} isMobile={isMobile} />}
         {/* ================= VISTA: ENLACES ================= */}
         {activeTab === 'enlaces' && (
           <div>
