@@ -997,7 +997,12 @@ function ChessWorkspace(props: {
   const [openingColor, setOpeningColor] = useState('Blancas');
   const [openingMoves, setOpeningMoves] = useState('');
   const [openingNotes, setOpeningNotes] = useState('');
+  const [readingResources, setReadingResources] = useState<{id:number;title:string;url:string}[]>(() => { try { return JSON.parse(localStorage.getItem('lifeos_chess_resources') || '[]'); } catch { return []; } });
+  const [resourceTitle, setResourceTitle] = useState('');
+  const [resourceUrl, setResourceUrl] = useState('');
+  const [selectedResourceId, setSelectedResourceId] = useState<number | null>(null);
   useEffect(() => { localStorage.setItem('lifeos_chess_openings', JSON.stringify(openings)); }, [openings]);
+  useEffect(() => { localStorage.setItem('lifeos_chess_resources', JSON.stringify(readingResources)); }, [readingResources]);
   const panel = { background: theme.card, border: '1px solid ' + theme.cardBorder, borderRadius: 17, padding: 16 };
   const field = { width: '100%', boxSizing: 'border-box' as const, padding: 10, borderRadius: 10, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, font: 'inherit' };
   const movePiece = (index: number) => {
@@ -1033,7 +1038,23 @@ function ChessWorkspace(props: {
     </section>}
     {tab === 'Recursos' && <div style={{ display: 'grid', gap: 13 }}>
       <section style={panel}><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>BIBLIOTECA DE AJEDREZ</div><h2 style={{ fontSize: 19, margin: '5px 0' }}>Libros y material de estudio</h2><p style={{ fontSize: 12, color: theme.textMuted }}>Lecturas abiertas y recursos seleccionados. Los libros se muestran dentro de LifeOS cuando el sitio permite inserción; también puedes abrir la fuente original.</p></section>
-      <section style={{ ...panel, padding: 0, overflow: 'hidden' }}><div style={{ padding: 15 }}><h3 style={{ margin: 0, fontSize: 16 }}>Chess Fundamentals — José Raúl Capablanca</h3><p style={{ fontSize: 11, color: theme.textMuted, margin: '5px 0 10px' }}>Clásico de estrategia, finales y principios de apertura. Texto íntegro disponible gratuitamente en Project Gutenberg.</p><a href="https://www.gutenberg.org/ebooks/33870" target="_blank" rel="noreferrer" style={{ color: theme.text, fontSize: 12, fontWeight: 900 }}>Abrir ficha y formatos ↗</a></div><iframe title="Chess Fundamentals de Capablanca" src="https://www.gutenberg.org/cache/epub/33870/pg33870-images.html" style={{ width: '100%', height: isMobile ? 560 : 760, border: 0, background: '#fff' }} loading="lazy" /></section>
+      <section style={panel}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>Tu biblioteca de lectura</h3>
+        <form onSubmit={e => { e.preventDefault(); if (!resourceTitle.trim() || !resourceUrl.trim()) return; try { const parsed = new URL(resourceUrl.trim()); if (!['https:','http:'].includes(parsed.protocol)) throw new Error(); const item = { id: Date.now(), title: resourceTitle.trim(), url: parsed.toString() }; setReadingResources(prev => [item, ...prev]); setSelectedResourceId(item.id); setResourceTitle(''); setResourceUrl(''); } catch { alert('Ingresa un enlace web válido que comience con https:// o http://'); } }} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.4fr auto', gap: 8 }}>
+          <input value={resourceTitle} onChange={e => setResourceTitle(e.target.value)} placeholder="Nombre del libro o recurso" required style={field}/>
+          <input value={resourceUrl} onChange={e => setResourceUrl(e.target.value)} placeholder="URL de lectura (HTML o visor web)" required style={field}/>
+          <button type="submit" style={{ border: 0, borderRadius: 10, padding: '9px 12px', background: theme.text, color: theme.bg, fontWeight: 900, cursor: 'pointer' }}>Añadir</button>
+        </form>
+        <p style={{ fontSize: 10, color: theme.textMuted, marginTop: 7 }}>Se guardan en este dispositivo y puedes abrirlos aquí si la página permite mostrarse dentro de otra app.</p>
+        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 11 }}>
+          <button onClick={() => setSelectedResourceId(null)} style={{ padding: '8px 10px', borderRadius: 9, border: '1px solid ' + theme.cardBorder, background: selectedResourceId === null ? theme.text : theme.bg, color: selectedResourceId === null ? theme.bg : theme.text, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>Capablanca · Libro clásico</button>
+          {readingResources.map(item => <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 3 }}><button onClick={() => setSelectedResourceId(item.id)} style={{ padding: '8px 10px', borderRadius: 9, border: '1px solid ' + theme.cardBorder, background: selectedResourceId === item.id ? theme.text : theme.bg, color: selectedResourceId === item.id ? theme.bg : theme.text, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{item.title}</button><button onClick={() => { setReadingResources(prev => prev.filter(x => x.id !== item.id)); if (selectedResourceId === item.id) setSelectedResourceId(null); }} title="Eliminar recurso" style={{ border: 0, background: 'transparent', color: theme.textMuted, cursor: 'pointer' }}>×</button></div>)}
+        </div>
+      </section>
+      <section style={{ ...panel, padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: 15 }}><h3 style={{ margin: 0, fontSize: 16 }}>{selectedResourceId === null ? 'Chess Fundamentals — José Raúl Capablanca' : (readingResources.find(x => x.id === selectedResourceId)?.title || 'Recurso')}</h3><p style={{ fontSize: 11, color: theme.textMuted, margin: '5px 0 10px' }}>Lectura integrada. Si el sitio bloquea la inserción, usa el enlace para abrirlo en una pestaña nueva.</p><a href={selectedResourceId === null ? 'https://www.gutenberg.org/ebooks/33870' : (readingResources.find(x => x.id === selectedResourceId)?.url || 'https://www.gutenberg.org/ebooks/33870')} target="_blank" rel="noreferrer" style={{ color: theme.text, fontSize: 12, fontWeight: 900 }}>Abrir fuente original ↗</a></div>
+        <iframe title="Lector de recursos de ajedrez" src={selectedResourceId === null ? 'https://www.gutenberg.org/cache/epub/33870/pg33870-images.html' : (readingResources.find(x => x.id === selectedResourceId)?.url || 'https://www.gutenberg.org/cache/epub/33870/pg33870-images.html')} style={{ width: '100%', height: isMobile ? 560 : 760, border: 0, background: '#fff' }} loading="lazy" />
+      </section>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,minmax(0,1fr))', gap: 12 }}>
         <article style={panel}><h3 style={{ fontSize: 15, margin: '0 0 6px' }}>Lichess · Learn</h3><p style={{ fontSize: 12, color: theme.textMuted, marginBottom: 10 }}>Lecciones interactivas de reglas, táctica, estrategia y finales.</p><a href="https://lichess.org/learn" target="_blank" rel="noreferrer" style={{ color: theme.text, fontWeight: 900, fontSize: 12 }}>Ir a las lecciones ↗</a></article>
         <article style={panel}><h3 style={{ fontSize: 15, margin: '0 0 6px' }}>Lichess · Practice</h3><p style={{ fontSize: 12, color: theme.textMuted, marginBottom: 10 }}>Practica mates, clavadas, ataques dobles y otros patrones tácticos.</p><a href="https://lichess.org/practice" target="_blank" rel="noreferrer" style={{ color: theme.text, fontWeight: 900, fontSize: 12 }}>Abrir ejercicios ↗</a></article>
