@@ -774,6 +774,10 @@ const LIFEOS_V9_CSS = `
   ::view-transition-new(root) { animation:lifeos-vt-new .22s cubic-bezier(.2,.75,.2,1) both; }
   @keyframes lifeos-vt-old { to { opacity:0; transform:scale(.995); filter:blur(1px); } }
   @keyframes lifeos-vt-new { from { opacity:0; transform:translateY(6px) scale(.995); filter:blur(2px); } to { opacity:1; transform:none; filter:none; } }
+  .lifeos-main { min-width:0; width:100%; max-width:none !important; box-sizing:border-box; }
+  .lifeos-app-shell { width:100%; max-width:none; min-width:0; }
+  .lifeos-dashboard { max-width:1500px; }
+  @media (min-width: 1200px) { .lifeos-main { padding-left:clamp(28px,3vw,56px) !important; padding-right:clamp(28px,3vw,56px) !important; } }
   @media (prefers-reduced-motion: reduce) {
     .lifeos-dash-card, .lifeos-dashboard-footer-card, .lifeos-card, .lifeos-animated-panel, .lifeos-chart-epic, .lifeos-chart-line, .lifeos-chart-baseline, .lifeos-page-transition, .lifeos-modal-overlay, .lifeos-modal-card { animation:none !important; }
     * { scroll-behavior:auto !important; }
@@ -3438,7 +3442,7 @@ export default function App() {
       )}
 
       {/* CONTENIDO PRINCIPAL */}
-      <main className="lifeos-main lifeos-page-transition" style={{ flex: 1, padding: isMobile ? '12px' : '22px 30px', overflowY: 'auto', maxWidth: '100vw' }}>
+      <main className="lifeos-main lifeos-page-transition" style={{ flex: 1, padding: isMobile ? '12px' : '22px 30px', overflowY: 'auto', maxWidth: 'none', minWidth: 0, width: '100%' }}>
         {isMobile && (
           <div className="lifeos-mobile-only lifeos-mobile-header" style={{ display: 'none', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', paddingBottom: '8px', borderBottom: `1px solid ${theme.cardBorder}` }}>
             <div style={{display:'flex',alignItems:'center',gap:10}}>
