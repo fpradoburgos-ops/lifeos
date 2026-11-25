@@ -1088,6 +1088,35 @@ function ChessWorkspace(props: {
   const [resourceTitle, setResourceTitle] = useState('');
   const [resourceUrl, setResourceUrl] = useState('');
   const [selectedResourceId, setSelectedResourceId] = useState<number | null>(null);
+  const [readerText, setReaderText] = useState('');
+  const [readerLoading, setReaderLoading] = useState(false);
+  const [readerError, setReaderError] = useState('');
+  const [readerPage, setReaderPage] = useState(0);
+  const readerPageSize = 12000;
+  const selectedResource = selectedResourceId === null ? null : readingResources.find(x => x.id === selectedResourceId) || null;
+  const selectedBookUrl = selectedResource?.url || 'https://www.gutenberg.org/ebooks/33870';
+  const selectedBookTitle = selectedResource?.title || 'Chess Fundamentals — José Raúl Capablanca';
+  const resolveBookTextUrl = (url: string) => {
+    const match = url.match(/(?:ebooks\/|files\/)(\d+)/) || url.match(/cache\/epub\/(\d+)/);
+    return match ? 'https://www.gutenberg.org/cache/epub/' + match[1] + '/pg' + match[1] + '.txt' : url;
+  };
+  useEffect(() => {
+    let cancelled = false;
+    setReaderText(''); setReaderError(''); setReaderPage(0); setReaderLoading(true);
+    fetch(resolveBookTextUrl(selectedBookUrl)).then(async response => {
+      if (!response.ok) throw new Error('La fuente respondió con error ' + response.status + '.');
+      const raw = await response.text();
+      const isHtml = /<html[\s>]/i.test(raw.slice(0, 500)) || /<!doctype html/i.test(raw.slice(0, 500));
+      const clean = isHtml ? new DOMParser().parseFromString(raw, 'text/html').body.innerText : raw;
+      if (!clean.trim()) throw new Error('El archivo no contiene texto legible.');
+      if (!cancelled) setReaderText(clean.replace(/\r/g, '').trim());
+    }).catch(error => {
+      if (!cancelled) setReaderError(error instanceof Error ? error.message : 'No se pudo cargar el texto. La fuente puede bloquear la lectura integrada.');
+    }).finally(() => { if (!cancelled) setReaderLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedBookUrl]);
+  const readerPages = Math.max(1, Math.ceil(readerText.length / readerPageSize));
+  const readerContent = readerText.slice(readerPage * readerPageSize, (readerPage + 1) * readerPageSize);
   useEffect(() => { localStorage.setItem('lifeos_chess_openings', JSON.stringify(openings)); }, [openings]);
   useEffect(() => { localStorage.setItem('lifeos_chess_resources', JSON.stringify(readingResources)); }, [readingResources]);
   const panel = { background: theme.card, border: '1px solid ' + theme.cardBorder, borderRadius: 17, padding: 16 };
@@ -1172,8 +1201,25 @@ function ChessWorkspace(props: {
         </div>
       </section>
       <section style={{ ...panel, padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: 15 }}><h3 style={{ margin: 0, fontSize: 16 }}>{selectedResourceId === null ? 'Chess Fundamentals — José Raúl Capablanca' : (readingResources.find(x => x.id === selectedResourceId)?.title || 'Recurso')}</h3><p style={{ fontSize: 11, color: theme.textMuted, margin: '5px 0 10px' }}>Lectura integrada. Si el sitio bloquea la inserción, usa el enlace para abrirlo en una pestaña nueva.</p><a href={selectedResourceId === null ? 'https://www.gutenberg.org/ebooks/33870' : (readingResources.find(x => x.id === selectedResourceId)?.url || 'https://www.gutenberg.org/ebooks/33870')} target="_blank" rel="noreferrer" style={{ color: theme.text, fontSize: 12, fontWeight: 900 }}>Abrir fuente original ↗</a></div>
-        <iframe title="Lector de recursos de ajedrez" src={selectedResourceId === null ? 'https://www.gutenberg.org/cache/epub/33870/pg33870-images.html' : (readingResources.find(x => x.id === selectedResourceId)?.url || 'https://www.gutenberg.org/cache/epub/33870/pg33870-images.html')} style={{ width: '100%', height: isMobile ? 560 : 760, border: 0, background: '#fff' }} loading="lazy" />
+        <div style={{ padding: 15, borderBottom: '1px solid ' + theme.cardBorder }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+            <div><h3 style={{ margin: 0, fontSize: 16 }}>{selectedBookTitle}</h3><p style={{ fontSize: 11, color: theme.textMuted, margin: '5px 0 0' }}>Lector integrado · texto del libro sin depender de un iframe externo.</p></div>
+            <a href={selectedBookUrl} target="_blank" rel="noreferrer" style={{ color: theme.text, fontSize: 11, fontWeight: 900 }}>Fuente original ↗</a>
+          </div>
+        </div>
+        {readerLoading ? <div style={{ padding: 30, textAlign: 'center', color: theme.textMuted, fontSize: 12 }}>Cargando el texto del libro…</div> : readerError ? <div style={{ padding: 18 }}>
+          <p style={{ color: theme.textMuted, fontSize: 12, lineHeight: 1.6 }}>No se pudo obtener el texto automáticamente desde esta dirección. Algunas páginas bloquean solicitudes desde otras aplicaciones. Puedes abrir la fuente original o agregar un enlace directo a un archivo de texto que permita lectura externa.</p>
+          <div style={{ fontSize: 11, color: '#b7791f' }}>{readerError}</div>
+        </div> : <>
+          <div style={{ padding: isMobile ? 14 : 24, minHeight: 460, maxHeight: 720, overflowY: 'auto', background: theme.bg, color: theme.text }}>
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontFamily: 'Georgia, serif', fontSize: 14, lineHeight: 1.8 }}>{readerContent}</pre>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: 12, borderTop: '1px solid ' + theme.cardBorder }}>
+            <button disabled={readerPage <= 0} onClick={() => setReaderPage(p => Math.max(0, p - 1))} style={{ ...field, width: 'auto', cursor: readerPage <= 0 ? 'not-allowed' : 'pointer', opacity: readerPage <= 0 ? .45 : 1 }}>← Anterior</button>
+            <span style={{ color: theme.textMuted, fontSize: 11 }}>Página {readerPage + 1} de {readerPages}</span>
+            <button disabled={readerPage >= readerPages - 1} onClick={() => setReaderPage(p => Math.min(readerPages - 1, p + 1))} style={{ ...field, width: 'auto', cursor: readerPage >= readerPages - 1 ? 'not-allowed' : 'pointer', opacity: readerPage >= readerPages - 1 ? .45 : 1 }}>Siguiente →</button>
+          </div>
+        </>}
       </section>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,minmax(0,1fr))', gap: 12 }}>
         <article style={panel}><h3 style={{ fontSize: 15, margin: '0 0 6px' }}>Lichess · Learn</h3><p style={{ fontSize: 12, color: theme.textMuted, marginBottom: 10 }}>Lecciones interactivas de reglas, táctica, estrategia y finales.</p><a href="https://lichess.org/learn" target="_blank" rel="noreferrer" style={{ color: theme.text, fontWeight: 900, fontSize: 12 }}>Ir a las lecciones ↗</a></article>

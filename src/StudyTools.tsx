@@ -2,86 +2,65 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 type StudyCard = { id: number; front: string; back: string; deck: string; learned: boolean };
 const readCards = (): StudyCard[] => { try { return JSON.parse(localStorage.getItem('lifeos_flashcards') || '[]'); } catch { return []; } };
+const readCourses = () => {
+  const cards = readCards();
+  try { const saved = JSON.parse(localStorage.getItem('lifeos_flashcard_courses') || 'null'); if (Array.isArray(saved)) return [...new Set(saved.map((x: unknown) => String(x).trim()).filter(Boolean))] as string[]; } catch {}
+  return [...new Set(cards.map(c => String(c.deck || '').trim()).filter(Boolean))];
+};
 
 export function FlashcardsWorkspace({ theme, isMobile }: { theme: any; isMobile: boolean }) {
   const [cards, setCards] = useState<StudyCard[]>(readCards);
-  const [deck, setDeck] = useState('Todas');
+  const [courses, setCourses] = useState<string[]>(readCourses);
+  const [course, setCourse] = useState<string | null>(null);
+  const [courseName, setCourseName] = useState('');
+  const [editingName, setEditingName] = useState(false);
   const [status, setStatus] = useState<'Todas'|'Pendientes'|'Aprendidas'>('Todas');
-  const [front, setFront] = useState('');
-  const [back, setBack] = useState('');
-  const [newDeck, setNewDeck] = useState('');
-  const [showBack, setShowBack] = useState(false);
-  const [current, setCurrent] = useState(0);
-  const [message, setMessage] = useState('');
+  const [front, setFront] = useState(''), [back, setBack] = useState('');
+  const [showBack, setShowBack] = useState(false), [current, setCurrent] = useState(0), [message, setMessage] = useState('');
   useEffect(() => { localStorage.setItem('lifeos_flashcards', JSON.stringify(cards)); }, [cards]);
-  const decks = useMemo(() => ['Todas', ...Array.from(new Set(cards.map(c => c.deck)))], [cards]);
-  const filtered = useMemo(() => cards.filter(c => (deck === 'Todas' || c.deck === deck) && (status === 'Todas' || (status === 'Aprendidas' ? c.learned : !c.learned))), [cards, deck, status]);
+  useEffect(() => { localStorage.setItem('lifeos_flashcard_courses', JSON.stringify(courses)); }, [courses]);
+  const courseCards = useMemo(() => course ? cards.filter(c => c.deck === course) : [], [cards, course]);
+  const filtered = useMemo(() => courseCards.filter(c => status === 'Todas' || (status === 'Aprendidas' ? c.learned : !c.learned)), [courseCards, status]);
   const active = filtered.length ? filtered[current % filtered.length] : null;
-  const panel: React.CSSProperties = { background: theme.card, border: '1px solid ' + theme.cardBorder, borderRadius: 18, padding: 17 };
-  const field: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: 11, borderRadius: 11, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, font: 'inherit' };
-  const addCard = (e: React.FormEvent) => { e.preventDefault(); if (!front.trim() || !back.trim()) return; setCards(prev => [{ id: Date.now(), front: front.trim(), back: back.trim(), deck: newDeck.trim() || 'General', learned: false }, ...prev]); setFront(''); setBack(''); setMessage('Tarjeta agregada'); };
+  const panel: React.CSSProperties = { background: theme.card, border: '1px solid ' + theme.cardBorder, borderRadius: 17, padding: 16, minWidth: 0 };
+  const field: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 10, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, font: 'inherit' };
+  const addCourse = (e: React.FormEvent) => { e.preventDefault(); const n = courseName.trim(); if (!n) return; if (courses.some(x => x.toLowerCase() === n.toLowerCase())) { setMessage('Ese ramo ya existe.'); return; } setCourses(v => [...v, n]); setCourse(n); setCourseName(''); setMessage(''); };
+  const renameCourse = (e: React.FormEvent) => { e.preventDefault(); const n = courseName.trim(); if (!course || !n) return; if (courses.some(x => x !== course && x.toLowerCase() === n.toLowerCase())) { setMessage('Ese ramo ya existe.'); return; } setCourses(v => v.map(x => x === course ? n : x)); setCards(v => v.map(c => c.deck === course ? { ...c, deck: n } : c)); setCourse(n); setEditingName(false); setCourseName(''); };
+  const deleteCourse = () => { if (!course) return; const count = courseCards.length; if (!window.confirm('¿Eliminar ' + course + ' y sus ' + count + ' flashcards?')) return; setCards(v => v.filter(c => c.deck !== course)); setCourses(v => v.filter(x => x !== course)); setCourse(null); setMessage('Ramo eliminado.'); };
+  const addCard = (e: React.FormEvent) => { e.preventDefault(); if (!course || !front.trim() || !back.trim()) return; setCards(v => [{ id: Date.now(), front: front.trim(), back: back.trim(), deck: course, learned: false }, ...v]); setFront(''); setBack(''); setCurrent(0); setShowBack(false); setMessage('Flashcard agregada.'); };
   const importFile = async (file?: File) => {
-    if (!file) return;
+    if (!file || !course) return;
     try {
-      const raw = await file.text();
-      let parsed: any[] = [];
-      if (file.name.toLowerCase().endsWith('.json')) {
-        const data = JSON.parse(raw); parsed = Array.isArray(data) ? data : (data.cards || data.flashcards || []);
-      } else {
-        parsed = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean).filter(line => !/^(front|pregunta|anverso)[,;\t|]/i.test(line)).map(line => {
-          const parts = line.split(/[\t|;]|,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
-          return { front: (parts[0] || '').replace(/^"|"$/g, '').trim(), back: (parts[1] || '').replace(/^"|"$/g, '').trim(), deck: (parts[2] || 'Importadas').replace(/^"|"$/g, '').trim() };
-        });
-      }
-      const incoming = parsed.map((x: any, i: number) => ({ id: Date.now() + i, front: String(x.front ?? x.question ?? x.pregunta ?? x.term ?? '').trim(), back: String(x.back ?? x.answer ?? x.respuesta ?? x.definition ?? '').trim(), deck: String(x.deck ?? x.baraja ?? x.subject ?? 'Importadas'), learned: Boolean(x.learned ?? x.aprendida) })).filter(x => x.front && x.back);
-      if (!incoming.length) throw new Error('No encontré tarjetas. Usa columnas front, back y deck, o pregunta|respuesta|baraja.');
-      setCards(prev => [...incoming, ...prev]); setMessage('Se importaron ' + incoming.length + ' tarjetas correctamente.');
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo leer el archivo.'); }
+      const raw = await file.text(); let rows: any[] = [];
+      if (file.name.toLowerCase().endsWith('.json')) { const data = JSON.parse(raw); rows = Array.isArray(data) ? data : (data.cards || data.flashcards || []); }
+      else rows = raw.split(/\r?\n/).map(x => x.trim()).filter(Boolean).filter(x => !/^(front|pregunta|anverso)[,;\t|]/i.test(x)).map(x => { const p = x.split(/[|;\t]|,(?=(?:[^"]*"[^"]*")*[^"]*$)/); return { front: p[0], back: p[1] }; });
+      const incoming = rows.map((x: any, i: number) => ({ id: Date.now() + i, front: String(x.front ?? x.question ?? x.pregunta ?? x.term ?? '').trim(), back: String(x.back ?? x.answer ?? x.respuesta ?? x.definition ?? '').trim(), deck: course, learned: Boolean(x.learned ?? x.aprendida) })).filter(x => x.front && x.back);
+      if (!incoming.length) throw new Error('No encontré tarjetas válidas. Usa columnas front y back.');
+      setCards(v => [...incoming, ...v]); setMessage('Se importaron ' + incoming.length + ' tarjetas en ' + course + '.');
+    } catch (err) { setMessage(err instanceof Error ? err.message : 'No se pudo leer el archivo.'); }
   };
-  return <div style={{ maxWidth: 1500, margin: '0 auto', display: 'grid', gap: 15 }}>
-    <header><div style={{ fontSize: 10, fontWeight: 900, letterSpacing: '.12em', color: theme.textMuted }}>ESTUDIO ACTIVO</div><h2 style={{ fontSize: 24, margin: '5px 0' }}>Flashcards</h2><p style={{ color: theme.textMuted, fontSize: 13 }}>Recuerda, repasa y organiza tus tarjetas por ramo o baraja.</p></header>
-    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3,minmax(0,1fr))', gap: 10 }}>
-      {[['Tarjetas', cards.length], ['Aprendidas', cards.filter(c => c.learned).length], ['Por aprender', cards.filter(c => !c.learned).length]].map(([label, value]) => <div key={String(label)} style={panel}><div style={{ fontSize: 11, color: theme.textMuted }}>{label}</div><div style={{ fontSize: 25, fontWeight: 900, marginTop: 4 }}>{value}</div></div>)}
-    </div>
-    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0,1.15fr) minmax(300px,.85fr)', gap: 14, alignItems: 'start' }}>
-      <section style={{ ...panel, minWidth: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}><h3 style={{ margin: 0, fontSize: 16 }}>Zona de repaso</h3><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><select value={deck} onChange={e => { setDeck(e.target.value); setCurrent(0); setShowBack(false); }} style={{ ...field, width: 'auto', padding: '7px 9px' }}>{decks.map(d => <option key={d}>{d}</option>)}</select><select value={status} onChange={e => { setStatus(e.target.value as any); setCurrent(0); setShowBack(false); }} style={{ ...field, width: 'auto', padding: '7px 9px' }}><option>Todas</option><option>Pendientes</option><option>Aprendidas</option></select></div></div>
-        {active ? <div>
-          <button onClick={() => setShowBack(v => !v)} style={{ width: '100%', minHeight: 230, padding: 24, borderRadius: 16, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, cursor: 'pointer', textAlign: 'center', display: 'grid', placeContent: 'center', gap: 12 }}>
-            <span style={{ fontSize: 10, letterSpacing: '.12em', color: theme.textMuted, fontWeight: 900 }}>{showBack ? 'RESPUESTA' : 'PREGUNTA'} · {active.deck.toUpperCase()}</span>
-            <span style={{ fontSize: 20, lineHeight: 1.45, fontWeight: 750, whiteSpace: 'pre-wrap' }}>{showBack ? active.back : active.front}</span>
-            <span style={{ fontSize: 11, color: theme.textMuted }}>Toca para {showBack ? 'ver la pregunta' : 'revelar la respuesta'}</span>
-          </button>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-            <button onClick={() => { setCurrent(v => (v - 1 + filtered.length) % filtered.length); setShowBack(false); }} style={{ ...field, width: 'auto', cursor: 'pointer' }}>← Anterior</button>
-            <button onClick={() => { setCards(prev => prev.map(c => c.id === active.id ? { ...c, learned: !c.learned } : c)); setShowBack(false); }} style={{ ...field, width: 'auto', cursor: 'pointer', fontWeight: 800 }}>{active.learned ? '↩ Repasar de nuevo' : '✓ Marcar aprendida'}</button>
-            <button onClick={() => { setCurrent(v => (v + 1) % filtered.length); setShowBack(false); }} style={{ ...field, width: 'auto', cursor: 'pointer' }}>Siguiente →</button>
-          </div>
-          <div style={{ fontSize: 11, color: theme.textMuted, textAlign: 'center', marginTop: 9 }}>{current % filtered.length + 1} de {filtered.length}</div>
-        </div> : <div style={{ padding: 35, textAlign: 'center', color: theme.textMuted }}>No hay tarjetas en este filtro. Crea una o importa un archivo para comenzar.</div>}
-      </section>
-      <div style={{ display: 'grid', gap: 14 }}>
-        <form onSubmit={addCard} style={{ ...panel, display: 'grid', gap: 9 }}>
-          <h3 style={{ fontSize: 16, margin: 0 }}>Crear tarjeta manual</h3>
-          <input required value={front} onChange={e => setFront(e.target.value)} placeholder="Pregunta / concepto" style={field}/>
-          <textarea required rows={3} value={back} onChange={e => setBack(e.target.value)} placeholder="Respuesta / explicación" style={{ ...field, resize: 'vertical' }}/>
-          <input value={newDeck} onChange={e => setNewDeck(e.target.value)} placeholder="Ramo o baraja (ej. Química)" style={field}/>
-          <button type="submit" style={{ border: 0, borderRadius: 11, padding: 11, background: theme.text, color: theme.bg, fontWeight: 900, cursor: 'pointer' }}>Agregar tarjeta</button>
-        </form>
-        <section style={panel}>
-          <h3 style={{ fontSize: 16, margin: '0 0 7px' }}>Importar desde IA</h3>
-          <p style={{ fontSize: 12, color: theme.textMuted, lineHeight: 1.5, marginBottom: 10 }}>Puedes pedirle a ChatGPT o Gemini que genere un archivo CSV o JSON y subirlo aquí. No requiere conexión con otra IA ni API.</p>
-          <label style={{ display: 'block', padding: 12, border: '1px dashed ' + theme.cardBorder, borderRadius: 12, cursor: 'pointer', textAlign: 'center', fontSize: 12, fontWeight: 800 }}>＋ Seleccionar archivo CSV, TXT o JSON<input type="file" accept=".csv,.txt,.json,text/csv,text/plain,application/json" onChange={e => { void importFile(e.target.files?.[0]); e.currentTarget.value = ''; }} style={{ display: 'none' }}/></label>
-          <p style={{ fontSize: 10, color: theme.textMuted, marginTop: 8 }}>Formato: front,back,deck · o una línea por tarjeta: pregunta|respuesta|baraja.</p>
-          {message && <p role="status" style={{ fontSize: 11, color: theme.textMuted, marginTop: 8 }}>{message}</p>}
+  const stats = (name: string) => { const list = cards.filter(c => c.deck === name); return { total: list.length, learned: list.filter(c => c.learned).length }; };
+  return <div style={{ maxWidth: 1500, margin: '0 auto', display: 'grid', gap: 14 }}>
+    <header><div style={{ fontSize: 10, fontWeight: 900, letterSpacing: '.12em', color: theme.textMuted }}>ESTUDIO ACTIVO</div><h2 style={{ fontSize: 24, margin: '5px 0' }}>Flashcards</h2><p style={{ color: theme.textMuted, fontSize: 13 }}>Un espacio independiente para cada ramo.</p></header>
+    {!course ? <>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3,minmax(0,1fr))', gap: 9 }}>{[['Ramos', courses.length], ['Tarjetas', cards.length], ['Aprendidas', cards.filter(c => c.learned).length]].map(([k,v]) => <div key={String(k)} style={panel}><div style={{ fontSize: 11, color: theme.textMuted }}>{k}</div><div style={{ fontSize: 24, fontWeight: 900 }}>{v}</div></div>)}</div>
+      <form onSubmit={addCourse} style={{ ...panel, display: 'flex', gap: 8, flexWrap: 'wrap' }}><input required value={courseName} onChange={e => setCourseName(e.target.value)} placeholder="Nombre del ramo (ej. Química General I)" style={{ ...field, flex: '1 1 230px', width: 'auto' }}/><button type="submit" style={{ border: 0, borderRadius: 10, padding: '10px 14px', background: theme.text, color: theme.bg, fontWeight: 850, cursor: 'pointer' }}>＋ Crear ramo</button></form>
+      <section style={panel}><h3 style={{ fontSize: 16, margin: '0 0 10px' }}>Mis ramos</h3>{courses.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(210px,1fr))', gap: 9 }}>{courses.map(name => { const s = stats(name); return <button key={name} onClick={() => { setCourse(name); setStatus('Todas'); setCurrent(0); setShowBack(false); setMessage(''); }} style={{ textAlign: 'left', padding: 14, borderRadius: 13, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, cursor: 'pointer' }}><strong style={{ fontSize: 14 }}>{name}</strong><div style={{ fontSize: 11, color: theme.textMuted, marginTop: 7 }}>{s.total} tarjetas · {s.learned} aprendidas</div><div style={{ height: 5, background: theme.cardBorder, borderRadius: 9, marginTop: 9, overflow: 'hidden' }}><div style={{ height: '100%', width: (s.total ? s.learned / s.total * 100 : 0) + '%', background: theme.text }}/></div></button>; })}</div> : <p style={{ color: theme.textMuted, fontSize: 12 }}>Aún no hay ramos. Crea el primero para comenzar.</p>}</section>
+    </> : <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}><button onClick={() => { setCourse(null); setMessage(''); }} style={{ ...field, width: 'auto', cursor: 'pointer' }}>← Todos los ramos</button><div style={{ display: 'flex', gap: 7 }}><button onClick={() => { setCourseName(course); setEditingName(true); }} style={{ ...field, width: 'auto', cursor: 'pointer' }}>Renombrar</button><button onClick={deleteCourse} style={{ ...field, width: 'auto', cursor: 'pointer', color: '#dc5555' }}>Eliminar</button></div></div>
+      <section style={panel}><div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>ESPACIO DE ESTUDIO</div><h2 style={{ fontSize: 22, margin: '4px 0' }}>{course}</h2><p style={{ fontSize: 12, color: theme.textMuted, margin: 0 }}>{courseCards.length} flashcards · {courseCards.filter(c => c.learned).length} aprendidas</p></section>
+      {editingName && <form onSubmit={renameCourse} style={{ ...panel, display: 'flex', gap: 8 }}><input autoFocus required value={courseName} onChange={e => setCourseName(e.target.value)} style={field}/><button type="submit" style={{ ...field, width: 'auto' }}>Guardar</button><button type="button" onClick={() => setEditingName(false)} style={{ ...field, width: 'auto' }}>Cancelar</button></form>}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0,1.15fr) minmax(280px,.85fr)', gap: 12, alignItems: 'start' }}>
+        <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}><h3 style={{ fontSize: 16, margin: 0 }}>Zona de repaso</h3><select value={status} onChange={e => { setStatus(e.target.value as any); setCurrent(0); setShowBack(false); }} style={{ ...field, width: 'auto' }}><option>Todas</option><option>Pendientes</option><option>Aprendidas</option></select></div>
+          {active ? <><button onClick={() => setShowBack(v => !v)} style={{ width: '100%', minHeight: 220, padding: 22, borderRadius: 15, border: '1px solid ' + theme.cardBorder, background: theme.bg, color: theme.text, cursor: 'pointer', textAlign: 'center', display: 'grid', placeContent: 'center', gap: 12 }}><span style={{ fontSize: 10, color: theme.textMuted, fontWeight: 900 }}>{showBack ? 'RESPUESTA' : 'PREGUNTA'}</span><span style={{ fontSize: 20, lineHeight: 1.45, fontWeight: 750, whiteSpace: 'pre-wrap' }}>{showBack ? active.back : active.front}</span><span style={{ fontSize: 11, color: theme.textMuted }}>Toca para {showBack ? 'ver la pregunta' : 'revelar la respuesta'}</span></button><div style={{ display: 'flex', justifyContent: 'space-between', gap: 7, marginTop: 10, flexWrap: 'wrap' }}><button onClick={() => { setCurrent(v => (v - 1 + filtered.length) % filtered.length); setShowBack(false); }} style={{ ...field, width: 'auto' }}>← Anterior</button><button onClick={() => { setCards(v => v.map(c => c.id === active.id ? { ...c, learned: !c.learned } : c)); setShowBack(false); }} style={{ ...field, width: 'auto', fontWeight: 800 }}>{active.learned ? '↩ Repasar' : '✓ Aprendida'}</button><button onClick={() => { setCurrent(v => (v + 1) % filtered.length); setShowBack(false); }} style={{ ...field, width: 'auto' }}>Siguiente →</button></div><div style={{ fontSize: 11, color: theme.textMuted, textAlign: 'center', marginTop: 8 }}>{current % filtered.length + 1} de {filtered.length}</div></> : <p style={{ padding: 25, textAlign: 'center', color: theme.textMuted, fontSize: 12 }}>No hay tarjetas en este filtro. Crea o importa algunas para comenzar.</p>}
         </section>
-        <section style={panel}>
-          <h3 style={{ fontSize: 15, margin: '0 0 8px' }}>Barajas</h3>
-          {decks.filter(d => d !== 'Todas').length ? decks.filter(d => d !== 'Todas').map(d => <div key={d} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid ' + theme.cardBorder, fontSize: 12 }}><span>{d}</span><span style={{ color: theme.textMuted }}>{cards.filter(c => c.deck === d).length} tarjetas</span></div>) : <p style={{ color: theme.textMuted, fontSize: 12 }}>Tus barajas aparecerán aquí.</p>}
-        </section>
+        <div style={{ display: 'grid', gap: 12 }}><form onSubmit={addCard} style={{ ...panel, display: 'grid', gap: 8 }}><h3 style={{ margin: 0, fontSize: 16 }}>Crear flashcard</h3><input required value={front} onChange={e => setFront(e.target.value)} placeholder="Pregunta / concepto" style={field}/><textarea required rows={3} value={back} onChange={e => setBack(e.target.value)} placeholder="Respuesta / explicación" style={{ ...field, resize: 'vertical' }}/><button type="submit" style={{ border: 0, borderRadius: 10, padding: 11, background: theme.text, color: theme.bg, fontWeight: 900 }}>＋ Agregar flashcard</button></form>
+          <section style={panel}><h3 style={{ margin: '0 0 7px', fontSize: 15 }}>Importar tarjetas</h3><p style={{ fontSize: 12, color: theme.textMuted }}>Los archivos CSV, TXT o JSON se importan directamente en este ramo.</p><label style={{ display: 'block', padding: 12, border: '1px dashed ' + theme.cardBorder, borderRadius: 11, cursor: 'pointer', textAlign: 'center', fontSize: 12, fontWeight: 800 }}>＋ Seleccionar archivo<input type="file" accept=".csv,.txt,.json" onChange={e => { void importFile(e.target.files?.[0]); e.currentTarget.value = ''; }} style={{ display: 'none' }}/></label></section>
+        </div>
       </div>
-    </div>
-    <section style={panel}><h3 style={{ fontSize: 15, margin: '0 0 8px' }}>Todas las tarjetas</h3>{cards.length ? cards.map(c => <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid ' + theme.cardBorder }}><div style={{ minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 800 }}>{c.front}</div><div style={{ fontSize: 10, color: theme.textMuted }}>{c.deck} · {c.learned ? 'Aprendida' : 'Pendiente'}</div></div><button onClick={() => setCards(prev => prev.filter(x => x.id !== c.id))} title="Eliminar tarjeta" style={{ border: 0, background: 'transparent', color: theme.textMuted, cursor: 'pointer' }}>×</button></div>) : <p style={{ fontSize: 12, color: theme.textMuted }}>Aún no has creado tarjetas.</p>}</section>
+      <section style={panel}><h3 style={{ margin: '0 0 8px', fontSize: 15 }}>Tarjetas de {course}</h3>{courseCards.length ? courseCards.map(c => <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid ' + theme.cardBorder }}><div style={{ minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 800 }}>{c.front}</div><div style={{ fontSize: 10, color: theme.textMuted }}>{c.learned ? 'Aprendida' : 'Pendiente'}</div></div><button onClick={() => setCards(v => v.filter(x => x.id !== c.id))} style={{ border: 0, background: 'transparent', color: theme.textMuted, cursor: 'pointer' }}>×</button></div>) : <p style={{ fontSize: 12, color: theme.textMuted }}>Aún no has creado flashcards en este ramo.</p>}</section>
+    </>}
+    {message && <p role="status" style={{ color: theme.textMuted, fontSize: 12 }}>{message}</p>}
   </div>;
 }
 
