@@ -40,8 +40,7 @@ import {
   Lightbulb,
   ClipboardList,
   Puzzle,
-  Trophy,
-  GraduationCap
+  Trophy
 } from 'lucide-react';
 
 type LifeOSTab = 'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes' | 'ayudante' | 'ajedrez';
@@ -1330,6 +1329,7 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem('lifeos_chess_sessions') || '[]'); } catch { return []; }
   });
   const [chessGoal, setChessGoal] = useState(() => localStorage.getItem('lifeos_chess_goal') || 'Jugar partidas más sólidas y analizar mis errores.');
+  const [chessRating, setChessRating] = useState(() => localStorage.getItem('lifeos_chess_rating') || '');
   const [chessMinutes, setChessMinutes] = useState('30');
   const [chessFocus, setChessFocus] = useState('Táctica');
   const [chessNotes, setChessNotes] = useState('');
@@ -1382,6 +1382,7 @@ export default function App() {
       localStorage.setItem('lifeos_assistant_entries', JSON.stringify(assistantEntries));
       localStorage.setItem('lifeos_chess_sessions', JSON.stringify(chessSessions));
       localStorage.setItem('lifeos_chess_goal', chessGoal);
+      localStorage.setItem('lifeos_chess_rating', chessRating);
       localStorage.setItem('lifeos_shopping_items', JSON.stringify(shoppingItems));
       localStorage.setItem('lifeos_habit_log', JSON.stringify(habitLog));
       localStorage.setItem('lifeos_notifications_enabled', String(notificationsEnabled));
@@ -1398,7 +1399,7 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
-  }, [darkMode, studentName, currentSemesterName, careerName, careerYears, currentSemesterNumber, dashboardAccountFilter, dashboardBackground, soundsEnabled, semStartDate, semEndDate, semesterDateConfig, academicBreaks, bookmarks, curriculum, spotifyEmbedUrl, musicWidgetEnabled, sesTestPeriod, sesUseAutomaticPeriod, sesScheduleRoomChoices, sesScheduleSectionChoices, sesScheduleBackup, sesClassNotificationsEnabled, accountsList, transactions, savingGoals, subjects, archivedSemesters, habits, habitLog, academicTasks, personalTodos, assistantEntries, chessSessions, chessGoal, shoppingItems, notificationsEnabled, emailCenterEnabled, emailAddress, emailDailyEnabled, emailDailyTime, emailClassEnabled, emailClassMinutes, emailEvaluationEnabled, emailEvaluationOffsets, emailSesChangesEnabled]);
+  }, [darkMode, studentName, currentSemesterName, careerName, careerYears, currentSemesterNumber, dashboardAccountFilter, dashboardBackground, soundsEnabled, semStartDate, semEndDate, semesterDateConfig, academicBreaks, bookmarks, curriculum, spotifyEmbedUrl, musicWidgetEnabled, sesTestPeriod, sesUseAutomaticPeriod, sesScheduleRoomChoices, sesScheduleSectionChoices, sesScheduleBackup, sesClassNotificationsEnabled, accountsList, transactions, savingGoals, subjects, archivedSemesters, habits, habitLog, academicTasks, personalTodos, assistantEntries, chessSessions, chessGoal, chessRating, shoppingItems, notificationsEnabled, emailCenterEnabled, emailAddress, emailDailyEnabled, emailDailyTime, emailClassEnabled, emailClassMinutes, emailEvaluationEnabled, emailEvaluationOffsets, emailSesChangesEnabled]);
 
   // v25: limpia exclusivamente los datos SES de prueba 2026-2 y deja LifeOS listo para 2027-1.
   useEffect(() => {
@@ -4515,7 +4516,7 @@ export default function App() {
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(2,minmax(0,1fr))',gap:10}}>
                   {assistantEntries.filter(item=>assistantFilter==='Todos'||item.type===assistantFilter).map(item=>(
-                    <article key={item.id} style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:16,padding:15,opacity:item.done?.65:1}}>
+                    <article key={item.id} style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:16,padding:15,opacity:item.done ? 0.65 : 1}}>
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:9}}>
                         <span style={{fontSize:10,fontWeight:900,letterSpacing:'.04em',color:theme.textMuted}}>{item.type.toUpperCase()}</span>
                         <button onClick={()=>setAssistantEntries(prev=>prev.filter(x=>x.id!==item.id))} title="Eliminar registro" aria-label="Eliminar registro" style={{border:0,background:'transparent',color:theme.textMuted,cursor:'pointer'}}><Trash2 size={15}/></button>
@@ -4544,7 +4545,7 @@ export default function App() {
             <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(3,minmax(0,1fr))',gap:10,marginBottom:14}}>
               <div style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:16,padding:16}}><div style={{fontSize:10,color:theme.textMuted,fontWeight:900}}>SESIONES</div><div style={{fontSize:27,fontWeight:900,marginTop:4}}>{chessSessions.length}</div></div>
               <div style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:16,padding:16}}><div style={{fontSize:10,color:theme.textMuted,fontWeight:900}}>TIEMPO ENTRENADO</div><div style={{fontSize:27,fontWeight:900,marginTop:4}}>{Math.floor(chessSessions.reduce((sum,x)=>sum+x.minutes,0)/60)} h {chessSessions.reduce((sum,x)=>sum+x.minutes,0)%60} min</div></div>
-              <div style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:16,padding:16}}><div style={{fontSize:10,color:theme.textMuted,fontWeight:900}}>OBJETIVO ACTUAL</div><div style={{fontSize:12,fontWeight:700,marginTop:7,lineHeight:1.4}}>{chessGoal}</div></div>
+              <div style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:16,padding:16}}><div style={{fontSize:10,color:theme.textMuted,fontWeight:900}}>ELO ACTUAL</div><input type="number" min="0" value={chessRating} onChange={e=>setChessRating(e.target.value)} placeholder="Opcional" style={{width:'100%',boxSizing:'border-box',marginTop:5,padding:7,borderRadius:9,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text}}/></div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'minmax(0,1fr) minmax(0,1fr)',gap:14,alignItems:'start'}}>
               <section style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:18,padding:18}}>
