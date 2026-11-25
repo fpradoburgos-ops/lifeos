@@ -36,8 +36,18 @@ import {
   BarChart3,
   Edit3,
   Image,
-  Volume2
+  Volume2,
+  Lightbulb,
+  ClipboardList,
+  Puzzle,
+  Trophy,
+  GraduationCap
 } from 'lucide-react';
+
+type LifeOSTab = 'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes' | 'ayudante' | 'ajedrez';
+type AssistantEntryType = 'Ramo' | 'Proyecto' | 'Idea' | 'Fórmula' | 'Reunión' | 'Tarea' | 'Ponderación';
+type AssistantEntry = { id: number; type: AssistantEntryType; title: string; course: string; content: string; date: string; weight: string; done: boolean };
+type ChessSession = { id: number; date: string; minutes: number; focus: string; notes: string };
 
 const LIFEOS_CAREER_SEED_VERSION = 'qyf_uchile_2027_v10';
 
@@ -884,7 +894,7 @@ export default function App() {
     document.documentElement.dataset.lifeosTheme = darkMode ? 'dark' : 'light';
   }, [darkMode]);
 
-  const [activeTab, setActiveTab] = useState<'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes'>(() => { try { return (sessionStorage.getItem('lifeos_ui_active_tab') as any) || 'inicio'; } catch { return 'inicio'; } });
+  const [activeTab, setActiveTab] = useState<LifeOSTab>(() => { try { return (sessionStorage.getItem('lifeos_ui_active_tab') as LifeOSTab) || 'inicio'; } catch { return 'inicio'; } });
   const [studySubTab, setStudySubTab] = useState<'semestre' | 'materias' | 'malla' | 'horario' | 'calendario' | 'historial'>(() => { try { return (sessionStorage.getItem('lifeos_ui_study_tab') as any) || 'materias'; } catch { return 'materias'; } });
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [todoFilter, setTodoFilter] = useState<'Todas' | 'Pendientes' | 'Completadas'>('Todas');
@@ -1303,6 +1313,27 @@ export default function App() {
     return [];
   });
 
+  // Centro de ayudantías: ramos, proyectos, ideas, fórmulas, reuniones y tareas.
+  const [assistantEntries, setAssistantEntries] = useState<AssistantEntry[]>(() => {
+    try { return JSON.parse(localStorage.getItem('lifeos_assistant_entries') || '[]'); } catch { return []; }
+  });
+  const [assistantType, setAssistantType] = useState<AssistantEntryType>('Proyecto');
+  const [assistantTitle, setAssistantTitle] = useState('');
+  const [assistantCourse, setAssistantCourse] = useState('');
+  const [assistantContent, setAssistantContent] = useState('');
+  const [assistantDate, setAssistantDate] = useState('');
+  const [assistantWeight, setAssistantWeight] = useState('');
+  const [assistantFilter, setAssistantFilter] = useState<'Todos' | AssistantEntryType>('Todos');
+
+  // Espacio inicial de entrenamiento de ajedrez.
+  const [chessSessions, setChessSessions] = useState<ChessSession[]>(() => {
+    try { return JSON.parse(localStorage.getItem('lifeos_chess_sessions') || '[]'); } catch { return []; }
+  });
+  const [chessGoal, setChessGoal] = useState(() => localStorage.getItem('lifeos_chess_goal') || 'Jugar partidas más sólidas y analizar mis errores.');
+  const [chessMinutes, setChessMinutes] = useState('30');
+  const [chessFocus, setChessFocus] = useState('Táctica');
+  const [chessNotes, setChessNotes] = useState('');
+
   // Sincronización en la nube
   const [cloudSession, setCloudSession] = useState<LifeOSCloudSession | null>(() => getStoredCloudSession());
   const [cloudEmail, setCloudEmail] = useState('');
@@ -1348,6 +1379,9 @@ export default function App() {
       localStorage.setItem('lifeos_habits', JSON.stringify(habits));
       localStorage.setItem('lifeos_academic_tasks', JSON.stringify(academicTasks));
       localStorage.setItem('lifeos_personal_todos', JSON.stringify(personalTodos));
+      localStorage.setItem('lifeos_assistant_entries', JSON.stringify(assistantEntries));
+      localStorage.setItem('lifeos_chess_sessions', JSON.stringify(chessSessions));
+      localStorage.setItem('lifeos_chess_goal', chessGoal);
       localStorage.setItem('lifeos_shopping_items', JSON.stringify(shoppingItems));
       localStorage.setItem('lifeos_habit_log', JSON.stringify(habitLog));
       localStorage.setItem('lifeos_notifications_enabled', String(notificationsEnabled));
@@ -1364,7 +1398,7 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
-  }, [darkMode, studentName, currentSemesterName, careerName, careerYears, currentSemesterNumber, dashboardAccountFilter, dashboardBackground, soundsEnabled, semStartDate, semEndDate, semesterDateConfig, academicBreaks, bookmarks, curriculum, spotifyEmbedUrl, musicWidgetEnabled, sesTestPeriod, sesUseAutomaticPeriod, sesScheduleRoomChoices, sesScheduleSectionChoices, sesScheduleBackup, sesClassNotificationsEnabled, accountsList, transactions, savingGoals, subjects, archivedSemesters, habits, habitLog, academicTasks, personalTodos, shoppingItems, notificationsEnabled, emailCenterEnabled, emailAddress, emailDailyEnabled, emailDailyTime, emailClassEnabled, emailClassMinutes, emailEvaluationEnabled, emailEvaluationOffsets, emailSesChangesEnabled]);
+  }, [darkMode, studentName, currentSemesterName, careerName, careerYears, currentSemesterNumber, dashboardAccountFilter, dashboardBackground, soundsEnabled, semStartDate, semEndDate, semesterDateConfig, academicBreaks, bookmarks, curriculum, spotifyEmbedUrl, musicWidgetEnabled, sesTestPeriod, sesUseAutomaticPeriod, sesScheduleRoomChoices, sesScheduleSectionChoices, sesScheduleBackup, sesClassNotificationsEnabled, accountsList, transactions, savingGoals, subjects, archivedSemesters, habits, habitLog, academicTasks, personalTodos, assistantEntries, chessSessions, chessGoal, shoppingItems, notificationsEnabled, emailCenterEnabled, emailAddress, emailDailyEnabled, emailDailyTime, emailClassEnabled, emailClassMinutes, emailEvaluationEnabled, emailEvaluationOffsets, emailSesChangesEnabled]);
 
   // v25: limpia exclusivamente los datos SES de prueba 2026-2 y deja LifeOS listo para 2027-1.
   useEffect(() => {
@@ -1890,7 +1924,7 @@ export default function App() {
     else action();
   };
 
-  const navigateTab = (tab: 'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes') => runViewTransition(() => { try { sessionStorage.setItem('lifeos_ui_active_tab', tab); } catch {} setActiveTab(tab); });
+  const navigateTab = (tab: LifeOSTab) => runViewTransition(() => { try { sessionStorage.setItem('lifeos_ui_active_tab', tab); } catch {} setActiveTab(tab); });
   const navigateStudyTab = (tab: 'semestre' | 'materias' | 'malla' | 'horario' | 'calendario' | 'historial') => runViewTransition(() => { try { sessionStorage.setItem('lifeos_ui_study_tab', tab); } catch {} setStudySubTab(tab); });
 
   useEffect(() => { try { sessionStorage.setItem('lifeos_ui_active_tab', activeTab); } catch {} }, [activeTab]);
@@ -3134,13 +3168,15 @@ export default function App() {
               { id: 'todos', label: 'To-Do List', icon: <ListTodo size={19} />, badge: pendingTodos },
               { id: 'calendario', label: 'Calendario Maestro', icon: <CalendarDays size={19} /> },
               { id: 'enlaces', label: 'Vault / Enlaces', icon: <Bookmark size={19} /> },
+              { id: 'ayudante', label: 'Ayudante', icon: <GraduationCap size={19} /> },
+              { id: 'ajedrez', label: 'Ajedrez', icon: <Puzzle size={19} /> },
               { id: 'ajustes', label: 'Configuración', icon: <Settings size={19} /> }
             ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => {
                   setSelectedAccountId(null);
-                  navigateTab(tab.id as 'inicio' | 'estudios' | 'habitos' | 'finanzas' | 'todos' | 'calendario' | 'enlaces' | 'ajustes');
+                  navigateTab(tab.id as LifeOSTab);
                   if (isMobile) setSidebarOpen(false);
                 }}
                 style={{
@@ -4441,6 +4477,100 @@ export default function App() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+
+        {/* ================= VISTA: AYUDANTE ================= */}
+        {activeTab === 'ayudante' && (
+          <div style={{maxWidth:1180,margin:'0 auto'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:14,flexWrap:'wrap',marginBottom:20}}>
+              <div><div className="lifeos-overline">CENTRO DE AYUDANTÍAS</div><h1 style={{fontSize:isMobile?25:32,fontWeight:900,margin:'5px 0'}}>Ayudante</h1><p style={{fontSize:13,color:theme.textMuted,margin:0}}>Organiza tus ramos, proyectos, recursos, reuniones y tareas académicas.</p></div>
+              <div style={{padding:'12px 16px',borderRadius:15,border:`1px solid ${theme.cardBorder}`,background:theme.card,minWidth:130}}><div style={{fontSize:10,color:theme.textMuted,fontWeight:800}}>REGISTROS</div><div style={{fontSize:25,fontWeight:900}}>{assistantEntries.length}</div></div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'minmax(300px,.85fr) minmax(0,1.5fr)',gap:14,alignItems:'start'}}>
+              <section style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:18,padding:18}}>
+                <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:14}}><Plus size={18}/><h2 style={{fontSize:16,margin:0}}>Nuevo registro</h2></div>
+                <form onSubmit={e=>{e.preventDefault();if(!assistantTitle.trim())return;setAssistantEntries(prev=>[{id:Date.now(),type:assistantType,title:assistantTitle.trim(),course:assistantCourse.trim(),content:assistantContent.trim(),date:assistantDate,weight:assistantWeight,done:false},...prev]);setAssistantTitle('');setAssistantContent('');setAssistantDate('');setAssistantWeight('');}} style={{display:'flex',flexDirection:'column',gap:10}}>
+                  <label style={{fontSize:11,fontWeight:800,color:theme.textMuted}}>TIPO DE REGISTRO</label>
+                  <select value={assistantType} onChange={e=>setAssistantType(e.target.value as AssistantEntryType)} style={{padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text}}>
+                    {(['Ramo','Proyecto','Idea','Fórmula','Reunión','Tarea','Ponderación'] as AssistantEntryType[]).map(t=><option key={t}>{t}</option>)}
+                  </select>
+                  <input required value={assistantTitle} onChange={e=>setAssistantTitle(e.target.value)} placeholder={assistantType==='Ramo'?'Ej. Química General':'Título o nombre'} style={{padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text}}/>
+                  <input value={assistantCourse} onChange={e=>setAssistantCourse(e.target.value)} placeholder="Ramo asociado (opcional)" style={{padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text}}/>
+                  <textarea value={assistantContent} onChange={e=>setAssistantContent(e.target.value)} placeholder={assistantType==='Fórmula'?'Fórmula, variables, unidades y explicación…':assistantType==='Reunión'?'Temas, acuerdos y próximos pasos…':'Detalles, ideas, enlaces o apuntes…'} rows={5} style={{resize:'vertical',padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text,fontFamily:'inherit'}}/>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                    <input type="date" value={assistantDate} onChange={e=>setAssistantDate(e.target.value)} aria-label="Fecha"/>
+                    <input value={assistantWeight} onChange={e=>setAssistantWeight(e.target.value)} placeholder="Ponderación (%)" aria-label="Ponderación" style={{minWidth:0,padding:9,borderRadius:10,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text}}/>
+                  </div>
+                  <button type="submit" style={{padding:12,border:0,borderRadius:11,background:theme.text,color:darkMode?'#090909':'#fff',fontWeight:900,cursor:'pointer'}}>Guardar en Ayudante</button>
+                </form>
+              </section>
+              <section style={{minWidth:0}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:12}}>
+                  <h2 style={{fontSize:17,margin:0}}>Tu espacio de trabajo</h2>
+                  <select value={assistantFilter} onChange={e=>setAssistantFilter(e.target.value as 'Todos'|AssistantEntryType)} style={{padding:'9px 11px',borderRadius:10,border:`1px solid ${theme.cardBorder}`,background:theme.card,color:theme.text}}>
+                    <option>Todos</option>{(['Ramo','Proyecto','Idea','Fórmula','Reunión','Tarea','Ponderación'] as AssistantEntryType[]).map(t=><option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(2,minmax(0,1fr))',gap:10}}>
+                  {assistantEntries.filter(item=>assistantFilter==='Todos'||item.type===assistantFilter).map(item=>(
+                    <article key={item.id} style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:16,padding:15,opacity:item.done?.65:1}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:9}}>
+                        <span style={{fontSize:10,fontWeight:900,letterSpacing:'.04em',color:theme.textMuted}}>{item.type.toUpperCase()}</span>
+                        <button onClick={()=>setAssistantEntries(prev=>prev.filter(x=>x.id!==item.id))} title="Eliminar registro" aria-label="Eliminar registro" style={{border:0,background:'transparent',color:theme.textMuted,cursor:'pointer'}}><Trash2 size={15}/></button>
+                      </div>
+                      <h3 style={{fontSize:15,margin:'0 0 5px',textDecoration:item.done?'line-through':'none'}}>{item.title}</h3>
+                      {item.course&&<div style={{fontSize:11,color:theme.textMuted,marginBottom:7}}><BookOpen size={12} style={{display:'inline',verticalAlign:'-2px'}}/> {item.course}</div>}
+                      {item.content&&<p style={{fontSize:12,lineHeight:1.55,color:theme.textMuted,whiteSpace:'pre-wrap',margin:'7px 0'}}>{item.content}</p>}
+                      <div style={{display:'flex',gap:8,flexWrap:'wrap',fontSize:10,color:theme.textMuted,marginTop:8}}>
+                        {item.date&&<span><CalendarDays size={11} style={{display:'inline',verticalAlign:'-2px'}}/> {item.date}</span>}
+                        {item.weight&&<span>⚖ {item.weight.includes('%')?item.weight:`${item.weight}%`}</span>}
+                      </div>
+                      {(item.type==='Tarea'||item.type==='Proyecto'||item.type==='Reunión')&&<button onClick={()=>setAssistantEntries(prev=>prev.map(x=>x.id===item.id?{...x,done:!x.done}:x))} style={{marginTop:12,padding:'7px 10px',borderRadius:9,border:`1px solid ${theme.cardBorder}`,background:item.done?theme.activeTab:'transparent',color:theme.text,fontSize:10,fontWeight:800,cursor:'pointer'}}>{item.done?'Reabrir':'Marcar como listo'}</button>}
+                    </article>
+                  ))}
+                </div>
+                {assistantEntries.filter(item=>assistantFilter==='Todos'||item.type===assistantFilter).length===0&&<div style={{padding:30,textAlign:'center',background:theme.card,border:`1px dashed ${theme.cardBorder}`,borderRadius:16,color:theme.textMuted}}><Lightbulb size={25}/><div style={{fontWeight:800,color:theme.text,marginTop:8}}>Tu espacio está listo</div><p style={{fontSize:12,margin:'5px 0 0'}}>Crea tu primer ramo, idea, fórmula, reunión o proyecto desde el formulario.</p></div>}
+              </section>
+            </div>
+          </div>
+        )}
+
+        {/* ================= VISTA: AJEDREZ ================= */}
+        {activeTab === 'ajedrez' && (
+          <div style={{maxWidth:1050,margin:'0 auto'}}>
+            <div style={{marginBottom:20}}><div className="lifeos-overline">ENTRENAMIENTO PERSONAL</div><h1 style={{fontSize:isMobile?25:32,fontWeight:900,margin:'5px 0'}}>Ajedrez ♟</h1><p style={{fontSize:13,color:theme.textMuted,margin:0}}>Un espacio para practicar con intención, registrar partidas y aprender de tus errores.</p></div>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(3,minmax(0,1fr))',gap:10,marginBottom:14}}>
+              <div style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:16,padding:16}}><div style={{fontSize:10,color:theme.textMuted,fontWeight:900}}>SESIONES</div><div style={{fontSize:27,fontWeight:900,marginTop:4}}>{chessSessions.length}</div></div>
+              <div style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:16,padding:16}}><div style={{fontSize:10,color:theme.textMuted,fontWeight:900}}>TIEMPO ENTRENADO</div><div style={{fontSize:27,fontWeight:900,marginTop:4}}>{Math.floor(chessSessions.reduce((sum,x)=>sum+x.minutes,0)/60)} h {chessSessions.reduce((sum,x)=>sum+x.minutes,0)%60} min</div></div>
+              <div style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:16,padding:16}}><div style={{fontSize:10,color:theme.textMuted,fontWeight:900}}>OBJETIVO ACTUAL</div><div style={{fontSize:12,fontWeight:700,marginTop:7,lineHeight:1.4}}>{chessGoal}</div></div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'minmax(0,1fr) minmax(0,1fr)',gap:14,alignItems:'start'}}>
+              <section style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:18,padding:18}}>
+                <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:12}}><Trophy size={18}/><h2 style={{fontSize:16,margin:0}}>Mi objetivo</h2></div>
+                <textarea value={chessGoal} onChange={e=>setChessGoal(e.target.value)} rows={3} placeholder="Ej. Llegar a 1200 ELO, mejorar cálculo táctico…" style={{width:'100%',boxSizing:'border-box',resize:'vertical',padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text,fontFamily:'inherit'}}/>
+                <h3 style={{fontSize:13,margin:'18px 0 10px'}}>Áreas de entrenamiento</h3>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                  {['Táctica','Aperturas','Estrategia','Finales','Cálculo','Análisis de partidas'].map((area,i)=><div key={area} style={{padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg}}><div style={{fontSize:11,fontWeight:800}}>{area}</div><div style={{fontSize:9,color:theme.textMuted,marginTop:3}}>{['Patrones y combinaciones','Principios y repertorio','Planes y estructuras','Rey y peones','Variantes y precisión','Errores y aprendizajes'][i]}</div></div>)}
+                </div>
+              </section>
+              <section style={{background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:18,padding:18}}>
+                <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:12}}><Plus size={18}/><h2 style={{fontSize:16,margin:0}}>Registrar entrenamiento</h2></div>
+                <form onSubmit={e=>{e.preventDefault();const mins=Math.max(1,Math.min(600,Number(chessMinutes)||30));setChessSessions(prev=>[{id:Date.now(),date:new Date().toISOString().slice(0,10),minutes:mins,focus:chessFocus,notes:chessNotes.trim()},...prev]);setChessNotes('');}} style={{display:'flex',flexDirection:'column',gap:10}}>
+                  <label style={{fontSize:11,color:theme.textMuted,fontWeight:800}}>ÁREA TRABAJADA</label>
+                  <select value={chessFocus} onChange={e=>setChessFocus(e.target.value)} style={{padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text}}>{['Táctica','Aperturas','Estrategia','Finales','Cálculo','Análisis de partidas','Partida rápida','Partida clásica'].map(x=><option key={x}>{x}</option>)}</select>
+                  <label style={{fontSize:11,color:theme.textMuted,fontWeight:800}}>MINUTOS</label>
+                  <input type="number" min="1" max="600" value={chessMinutes} onChange={e=>setChessMinutes(e.target.value)} style={{padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text}}/>
+                  <textarea rows={4} value={chessNotes} onChange={e=>setChessNotes(e.target.value)} placeholder="¿Qué aprendiste? ¿Qué error detectaste? ¿Qué quieres repasar?" style={{resize:'vertical',padding:11,borderRadius:11,border:`1px solid ${theme.cardBorder}`,background:theme.bg,color:theme.text,fontFamily:'inherit'}}/>
+                  <button type="submit" style={{padding:12,border:0,borderRadius:11,background:theme.text,color:darkMode?'#090909':'#fff',fontWeight:900,cursor:'pointer'}}>Guardar sesión</button>
+                </form>
+              </section>
+            </div>
+            <section style={{marginTop:14,background:theme.card,border:`1px solid ${theme.cardBorder}`,borderRadius:18,padding:18}}>
+              <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:12}}><ClipboardList size={18}/><h2 style={{fontSize:16,margin:0}}>Bitácora de entrenamiento</h2></div>
+              {chessSessions.length===0?<div style={{padding:22,textAlign:'center',color:theme.textMuted}}><Puzzle size={25}/><p style={{fontSize:12}}>Todavía no hay sesiones. Registra tu primera práctica para empezar a medir tu progreso.</p></div>:<div style={{display:'flex',flexDirection:'column',gap:8}}>{chessSessions.map(session=><div key={session.id} style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',padding:12,borderRadius:12,border:`1px solid ${theme.cardBorder}`,background:theme.bg}}><div><div style={{fontSize:12,fontWeight:900}}>{session.focus} · {session.minutes} min</div><div style={{fontSize:10,color:theme.textMuted,marginTop:3}}>{session.date}</div>{session.notes&&<p style={{fontSize:12,whiteSpace:'pre-wrap',margin:'7px 0 0',lineHeight:1.5}}>{session.notes}</p>}</div><button onClick={()=>setChessSessions(prev=>prev.filter(x=>x.id!==session.id))} aria-label="Eliminar sesión" title="Eliminar sesión" style={{border:0,background:'transparent',color:theme.textMuted,cursor:'pointer'}}><Trash2 size={15}/></button></div>)}</div>}
+            </section>
           </div>
         )}
 
