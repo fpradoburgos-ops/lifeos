@@ -1098,7 +1098,7 @@ function ChessWorkspace(props: {
   const selectedBookTitle = selectedResource?.title || 'Chess Fundamentals — José Raúl Capablanca';
   const resolveBookTextUrl = (url: string) => {
     const match = url.match(/(?:ebooks\/|files\/)(\d+)/) || url.match(/cache\/epub\/(\d+)/);
-    return match ? 'https://www.gutenberg.org/cache/epub/' + match[1] + '/pg' + match[1] + '.txt' : url;
+    return match ? '/api/chess-book?id=' + match[1] : url;
   };
   useEffect(() => {
     let cancelled = false;
