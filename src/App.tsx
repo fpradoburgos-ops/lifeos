@@ -900,7 +900,7 @@ function AssistantWorkspace({ theme, isMobile }: { theme: any; isMobile: boolean
     } catch { return []; }
   });
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
-  const [section, setSection] = useState<AssistantCourseSection>('Recursos a presentar');
+  const [section, setSection] = useState<AssistantCourseSection | 'Contactos docentes'>('Recursos a presentar');
   const [courseName, setCourseName] = useState('');
   const [courseCode, setCourseCode] = useState('');
   const [courseDescription, setCourseDescription] = useState('');
