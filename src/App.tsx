@@ -1020,7 +1020,6 @@ const START_CHESS_BOARD = 'rnbqkbnrpppppppp................................PPPPP
 
 type ChessSide = 'white' | 'black';
 const chessSideOf = (piece:string):ChessSide | null => !piece || piece==='.' ? null : piece===piece.toUpperCase() ? 'white' : 'black';
-const chessInside = (r:number,c:number) => r>=0 && r<8 && c>=0 && c<8;
 const chessFindKing = (board:string[],side:ChessSide) => board.findIndex(p=>p===(side==='white'?'K':'k'));
 const chessAttacked = (board:string[],target:number,by:ChessSide):boolean => {
   const tr=Math.floor(target/8),tc=target%8;
